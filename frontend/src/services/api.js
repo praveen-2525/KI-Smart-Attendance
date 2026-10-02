@@ -59,7 +59,7 @@ api.interceptors.response.use(
 
 // Auth APIs
 export const authApi = {
-  login: (loginId, password) => api.post('/auth/login', { login_id: loginId, password }),
+  login: (loginId, password, targetRole = null) => api.post('/auth/login', { login_id: loginId, password, target_role: targetRole }),
   getMe: () => api.get('/auth/me'),
   changePassword: (currentPassword, newPassword) =>
     api.post('/auth/change-password', { current_password: currentPassword, new_password: newPassword }),
@@ -150,13 +150,13 @@ export const reportsApi = {
 export const adminApi = {
   getDepartments: () => api.get('/admin/departments'),
   getClasses: (deptId) => api.get('/admin/classes', { params: { department_id: deptId } }),
-  getSections: (classId) => api.get('/admin/sections', { params: { class_id: classId } }),
+  getSections: () => api.get('/admin/config/sections'),
   getSubjects: (params) => api.get('/admin/subjects', { params }),
   getSettings: () => api.get('/admin/settings'),
   updateSetting: (key, value) => api.put(`/admin/settings/${key}`, { value }),
   createDepartment: (data) => api.post('/admin/departments', data),
   createClass: (data) => api.post('/admin/classes', data),
-  createSection: (data) => api.post('/admin/sections', data),
+  createSection: (data) => api.post('/admin/config/sections', data),
   createSubject: (data) => api.post('/admin/subjects', data),
   createTimetable: (data) => api.post('/admin/timetable', data),
 };
@@ -164,12 +164,14 @@ export const adminApi = {
 // User management APIs
 export const usersApi = {
   listStudents: (params) => api.get('/users/students', { params }),
+  listStaff: (params) => api.get('/users/staff', { params }),
   createStudent: (data) => api.post('/users/student', data),
   createFaculty: (data) => api.post('/users/faculty', data),
   toggleStatus: (userId) => api.put(`/users/${userId}/toggle-status`),
   importStudents: (formData) => api.post('/users/students/import', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
+  createInstitutionalUser: (data) => api.post('/users/institutional', data),
 };
 
 // ERP APIs

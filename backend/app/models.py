@@ -23,6 +23,7 @@ class UserRole(str, enum.Enum):
     ADVISOR = "advisor"
     HOD = "hod"
     DEO = "deo"
+    STAFF = "staff"
 
 
 class AttendanceStatus(str, enum.Enum):

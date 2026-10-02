@@ -9,13 +9,9 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from app.database import connect_to_mongo, close_mongo_connection
-import os
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, HTTPException
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from sqlalchemy.exc import SQLAlchemyError
 from app.config import settings
 
 # Import routers
@@ -116,14 +112,6 @@ app.include_router(reports_router, prefix="/api/v1")
 app.include_router(qr_router, prefix="/api/v1")
 app.include_router(erp_router, prefix="/api/v1")
 
-
-# Error handlers
-@app.exception_handler(SQLAlchemyError)
-async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Database error occurred. Please try again."}
-    )
 
 
 @app.exception_handler(HTTPException)

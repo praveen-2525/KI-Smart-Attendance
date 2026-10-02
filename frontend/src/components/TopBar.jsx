@@ -12,8 +12,9 @@ const PRIORITY_COLORS = {
 };
 
 export default function TopBar({ title }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [notifOpen, setNotifOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const qc = useQueryClient();
 
   const { data: notifData } = useQuery({
@@ -69,9 +70,65 @@ export default function TopBar({ title }) {
             {unreadCount > 0 && <span className="notif-dot" />}
           </button>
 
-          {/* User avatar */}
-          <div className="avatar" style={{ cursor: 'default' }}>
-            {user?.full_name?.split(' ').map(n => n[0]).slice(0, 2).join('') || '?'}
+          {/* Profile Dropdown */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setProfileOpen(!profileOpen)}
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid var(--border-dark)',
+                borderRadius: 20, padding: '4px 12px 4px 6px',
+                display: 'flex', alignItems: 'center', gap: 8,
+                color: '#e2e8f0', cursor: 'pointer', fontSize: 13,
+                fontWeight: 600
+              }}
+            >
+              <div className="avatar" style={{ width: 28, height: 28, fontSize: 12 }}>
+                {user?.full_name?.split(' ').map(n => n[0]).slice(0, 2).join('') || '?'}
+              </div>
+              <span>Profile ▼</span>
+            </button>
+
+            {profileOpen && (
+              <div style={{
+                position: 'absolute', right: 0, top: '120%',
+                background: 'var(--surface-dark-2)',
+                border: '1px solid var(--border-dark)',
+                borderRadius: 14, padding: '8px', width: 200,
+                boxShadow: 'var(--shadow-lg)', zIndex: 200
+              }}>
+                <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-dark)', marginBottom: 4 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>{user?.full_name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--gray-500)', textTransform: 'capitalize' }}>{user?.role}</div>
+                </div>
+                <a
+                  href="/profile"
+                  onClick={(e) => { e.preventDefault(); setProfileOpen(false); window.location.href = '/profile'; }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '8px 12px', borderRadius: 8, color: '#e2e8f0',
+                    fontSize: 13, textDecoration: 'none'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                  onMouseOut={e => e.currentTarget.style.background = 'none'}
+                >
+                  👤 View Profile
+                </a>
+                <button
+                  onClick={() => { setProfileOpen(false); logout(); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                    padding: '8px 12px', borderRadius: 8, color: '#ef4444',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 13, textAlign: 'left', marginTop: 2
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = 'rgba(239,68,68,0.1)'}
+                  onMouseOut={e => e.currentTarget.style.background = 'none'}
+                >
+                  🚪 Sign Out
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

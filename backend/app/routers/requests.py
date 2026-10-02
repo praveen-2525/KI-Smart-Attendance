@@ -1,33 +1,28 @@
 """
-Leave, Late Arrival, Correction, Notification, Timetable, User Management Routers
+Leave, Late Arrival, Correction, Notification, Timetable, Audit Routers
+All using MongoDB (Motor async driver)
 """
 from datetime import date, datetime, time, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
-from sqlalchemy.orm import Session
-from sqlalchemy import and_
 from pydantic import BaseModel
 from app.database import get_db
 from app import models
 from app.auth import get_current_user, require_roles
-from app.notification_service import NotificationService
-from app.audit_service import AuditService
 from app.config import settings
-from app.attendance_applier import apply_leave_to_attendance
-import uuid, os
+import secrets, re, uuid, os
 
 # ============================================================
 # LEAVE ROUTER
 # ============================================================
 leave_router = APIRouter(tags=["Leave Requests"])
 
-import secrets
-import re
 
 def _generate_leave_id():
     date_str = datetime.now().strftime("%Y%m%d")
     rand_str = secrets.token_hex(2).upper()
     return f"LEV-{date_str}-{rand_str}"
+
 
 async def _process_leave_submission(
     leave_type: str,
@@ -102,13 +97,11 @@ async def _process_leave_submission(
         ext = os.path.splitext(document.filename)[-1].lower()
         if ext not in allowed_exts:
             raise HTTPException(status_code=400, detail=f"Invalid document format '{ext}'. Allowed: PDF, JPG, JPEG, PNG.")
-        
-        # Check size limit (max 10MB)
+
         content = await document.read()
         if len(content) > 10 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File size exceeds maximum limit of 10MB.")
-        
-        # Save file
+
         upload_dir = os.path.join(settings.UPLOAD_DIR, "leave")
         os.makedirs(upload_dir, exist_ok=True)
         filename = f"{uuid.uuid4()}{ext}"
@@ -166,6 +159,7 @@ async def _process_leave_submission(
         "status": "Pending"
     }
 
+
 @leave_router.post("/leave-requests")
 @leave_router.post("/leave/submit")
 async def create_leave_request(
@@ -195,9 +189,10 @@ async def create_leave_request(
         mongo_db=mongo_db
     )
 
+
 @leave_router.get("/leave-requests/my")
 @leave_router.get("/leave/my")
-async def get_my_leave_requests_mongo(
+async def get_my_leave_requests(
     current_user: models.User = Depends(get_current_user),
     mongo_db = Depends(get_db)
 ):
@@ -214,9 +209,10 @@ async def get_my_leave_requests_mongo(
 
     return {"requests": requests}
 
+
 @leave_router.get("/leave-requests/pending")
 @leave_router.get("/leave/pending")
-async def get_pending_leave_requests_mongo(
+async def get_pending_leave_requests(
     current_user: models.User = Depends(require_roles(
         models.UserRole.ADVISOR, models.UserRole.HOD, models.UserRole.DEO
     )),
@@ -231,6 +227,7 @@ async def get_pending_leave_requests_mongo(
         del r["_id"]
 
     return {"requests": requests}
+
 
 @leave_router.get("/leave-requests/{request_id}")
 @leave_router.get("/leave/{request_id}")
@@ -251,6 +248,7 @@ async def get_leave_request_detail(
     leave["id"] = str(leave["_id"])
     del leave["_id"]
     return leave
+
 
 @leave_router.post("/leave-requests/{request_id}/cancel")
 async def cancel_leave_request(
@@ -277,10 +275,11 @@ async def cancel_leave_request(
     )
     return {"message": "Leave request cancelled successfully.", "status": "Cancelled"}
 
+
 @leave_router.post("/leave-requests/{request_id}/review")
 async def review_leave_request(
     request_id: str,
-    status: str = Form(...), # "Approved" or "Rejected"
+    status: str = Form(...),  # "Approved" or "Rejected"
     reviewerRemarks: Optional[str] = Form(""),
     current_user: models.User = Depends(require_roles(
         models.UserRole.ADVISOR, models.UserRole.HOD
@@ -310,8 +309,19 @@ async def review_leave_request(
             "updatedAt": now_iso
         }}
     )
-    return {"message": f"Leave request {status.lower()} successfully.", "status": status}
 
+    # Log to audit_logs in MongoDB
+    await mongo_db["audit_logs"].insert_one({
+        "action": f"LEAVE_{status.upper()}",
+        "entity_type": "leave_request",
+        "entity_id": str(leave["_id"]),
+        "user_id": str(current_user.id),
+        "user_role": str(current_user.role),
+        "reason": reviewerRemarks or "",
+        "created_at": now_iso
+    })
+
+    return {"message": f"Leave request {status.lower()} successfully.", "status": status}
 
 
 # ============================================================
@@ -328,75 +338,49 @@ async def inform_late_arrival(
     description: str = Form(""),
     document: Optional[UploadFile] = File(None),
     current_user: models.User = Depends(require_roles(models.UserRole.STUDENT)),
-    db: Session = Depends(get_db)
+    mongo_db = Depends(get_db)
 ):
-    student = current_user.student_profile
     doc_path = None
     if document:
-        doc_path = await _save_upload(document, f"late/{student.id}")
+        upload_dir = os.path.join(settings.UPLOAD_DIR, "late")
+        os.makedirs(upload_dir, exist_ok=True)
+        ext = os.path.splitext(document.filename)[-1].lower()
+        filename = f"{uuid.uuid4()}{ext}"
+        content = await document.read()
+        with open(os.path.join(upload_dir, filename), "wb") as f:
+            f.write(content)
+        doc_path = f"/uploads/late/{filename}"
 
-    late = models.LateArrivalRequest(
-        student_id=student.id,
-        date=date.fromisoformat(arrival_date),
-        expected_arrival_time=time.fromisoformat(expected_arrival_time),
-        reason=reason,
-        description=description,
-        document_path=doc_path
-    )
-    db.add(late)
-    db.flush()
-
-    # Find current period faculty
-    now_time = datetime.now().time()
-    day_of_week = datetime.now().weekday()
-    current_period = db.query(models.TimetableEntry).filter(
-        models.TimetableEntry.section_id == student.section_id,
-        models.TimetableEntry.day_of_week == day_of_week,
-        models.TimetableEntry.start_time <= now_time,
-        models.TimetableEntry.end_time >= now_time,
-        models.TimetableEntry.is_active == True
-    ).first()
-
-    notif = NotificationService(db)
-    if current_period and current_period.faculty:
-        late.notified_faculty_id = current_period.faculty_id
-        notif.notify_late_arrival(late, current_period.faculty.user_id)
-
-    # Notify advisor
-    section = student.section
-    if section and section.advisor:
-        notif.create_notification(
-            section.advisor.user_id,
-            models.NotificationCategory.LATE_ARRIVAL,
-            "Late Arrival Notification",
-            f"{student.user.full_name} will arrive late at {expected_arrival_time}.",
-            priority=models.NotificationPriority.INFORMATION,
-            reference_type="late_arrival",
-            reference_id=late.id
-        )
-        late.notified_advisor = True
-
-    db.commit()
-    return {"message": "Late arrival notification sent", "late_id": late.id}
+    now_iso = datetime.now(timezone.utc).isoformat()
+    late_record = {
+        "studentLoginId": current_user.login_id,
+        "studentName": current_user.full_name,
+        "date": arrival_date,
+        "expected_arrival_time": expected_arrival_time,
+        "reason": reason,
+        "description": description,
+        "document_path": doc_path,
+        "status": "pending",
+        "created_at": now_iso
+    }
+    result = await mongo_db["late_arrival_requests"].insert_one(late_record)
+    return {"message": "Late arrival notification sent", "id": str(result.inserted_id)}
 
 
 @late_router.get("/my")
 async def get_my_late_requests(
     current_user: models.User = Depends(require_roles(models.UserRole.STUDENT)),
-    db: Session = Depends(get_db)
+    mongo_db = Depends(get_db)
 ):
-    student = current_user.student_profile
-    requests = db.query(models.LateArrivalRequest).filter(
-        models.LateArrivalRequest.student_id == student.id
-    ).order_by(models.LateArrivalRequest.created_at.desc()).all()
-    return {
-        "requests": [
-            {
-                "id": r.id, "date": r.date, "expected_arrival_time": r.expected_arrival_time,
-                "reason": r.reason, "status": r.status, "created_at": r.created_at
-            } for r in requests
-        ]
-    }
+    requests = await mongo_db["late_arrival_requests"].find({
+        "studentLoginId": current_user.login_id
+    }).sort("created_at", -1).to_list(length=100)
+
+    for r in requests:
+        r["id"] = str(r["_id"])
+        del r["_id"]
+
+    return {"requests": requests}
 
 
 # ============================================================
@@ -406,7 +390,7 @@ correction_router = APIRouter(prefix="/correction", tags=["Attendance Correction
 
 
 class CorrectionRequest(BaseModel):
-    attendance_record_id: int
+    attendance_record_id: str  # MongoDB ObjectId string
     claimed_status: str
     explanation: str
 
@@ -415,72 +399,64 @@ class CorrectionRequest(BaseModel):
 async def submit_correction(
     data: CorrectionRequest,
     current_user: models.User = Depends(require_roles(models.UserRole.STUDENT)),
-    db: Session = Depends(get_db)
+    mongo_db = Depends(get_db)
 ):
-    student = current_user.student_profile
-    record = db.query(models.AttendanceRecord).filter(
-        models.AttendanceRecord.id == data.attendance_record_id,
-        models.AttendanceRecord.student_id == student.id
-    ).first()
-
-    if not record:
-        raise HTTPException(status_code=404, detail="Attendance record not found")
-
-    # Check if correction already pending
-    existing = db.query(models.AttendanceCorrection).filter(
-        models.AttendanceCorrection.attendance_record_id == record.id,
-        models.AttendanceCorrection.status == models.CorrectionStatus.PENDING
-    ).first()
+    now_iso = datetime.now(timezone.utc).isoformat()
+    # Check for existing pending
+    from bson import ObjectId
+    existing = await mongo_db["attendance_corrections"].find_one({
+        "attendance_record_id": data.attendance_record_id,
+        "student_login_id": current_user.login_id,
+        "status": "pending"
+    })
     if existing:
-        raise HTTPException(status_code=400, detail="Correction already pending for this record")
+        raise HTTPException(status_code=400, detail="A pending correction for this record already exists.")
 
-    # Check for QR evidence
-    qr_scan = db.query(models.QRScan).filter(
-        models.QRScan.student_id == student.id
-    ).filter(
-        # Approximate: find QR scans on same date/period
-    ).first()
+    correction_doc = {
+        "student_login_id": current_user.login_id,
+        "student_name": current_user.full_name,
+        "attendance_record_id": data.attendance_record_id,
+        "claimed_status": data.claimed_status,
+        "explanation": data.explanation,
+        "status": "pending",
+        "current_status": "AB",  # default assumption
+        "faculty_notes": None,
+        "reviewed_by": None,
+        "reviewed_at": None,
+        "created_at": now_iso,
+        "updated_at": now_iso
+    }
 
-    correction = models.AttendanceCorrection(
-        student_id=student.id,
-        attendance_record_id=record.id,
-        current_status=record.status,
-        claimed_status=data.claimed_status,
-        explanation=data.explanation,
-        status=models.CorrectionStatus.PENDING
-    )
-    db.add(correction)
-    db.flush()
+    result = await mongo_db["attendance_corrections"].insert_one(correction_doc)
 
-    audit = AuditService(db)
-    audit.log(
-        action="CORRECTION_SUBMITTED",
-        entity_type="attendance_correction",
-        entity_id=correction.id,
-        user_id=current_user.id,
-        user_role=current_user.role,
-        previous_value={"status": str(record.status)},
-        new_value={"claimed_status": data.claimed_status},
-        reason=data.explanation
-    )
+    # Audit log
+    await mongo_db["audit_logs"].insert_one({
+        "action": "CORRECTION_SUBMITTED",
+        "entity_type": "attendance_correction",
+        "entity_id": str(result.inserted_id),
+        "user_id": str(current_user.id),
+        "user_role": str(current_user.role),
+        "reason": data.explanation,
+        "created_at": now_iso
+    })
 
-    notif = NotificationService(db)
-    notif.notify_correction_submitted(correction)
-
-    db.commit()
-    return {"message": "Correction request submitted", "correction_id": correction.id}
+    return {"message": "Correction request submitted", "correction_id": str(result.inserted_id)}
 
 
 @correction_router.get("/my")
 async def get_my_corrections(
     current_user: models.User = Depends(require_roles(models.UserRole.STUDENT)),
-    db: Session = Depends(get_db)
+    mongo_db = Depends(get_db)
 ):
-    student = current_user.student_profile
-    corrections = db.query(models.AttendanceCorrection).filter(
-        models.AttendanceCorrection.student_id == student.id
-    ).order_by(models.AttendanceCorrection.created_at.desc()).all()
-    return {"corrections": [_format_correction(c) for c in corrections]}
+    corrections = await mongo_db["attendance_corrections"].find({
+        "student_login_id": current_user.login_id
+    }).sort("created_at", -1).to_list(length=100)
+
+    for c in corrections:
+        c["id"] = str(c["_id"])
+        del c["_id"]
+
+    return {"corrections": corrections}
 
 
 @correction_router.get("/pending")
@@ -488,123 +464,101 @@ async def get_pending_corrections(
     current_user: models.User = Depends(require_roles(
         models.UserRole.FACULTY, models.UserRole.ADVISOR, models.UserRole.HOD
     )),
-    db: Session = Depends(get_db)
+    mongo_db = Depends(get_db)
 ):
-    corrections = db.query(models.AttendanceCorrection).filter(
-        models.AttendanceCorrection.status.in_([
-            models.CorrectionStatus.PENDING, models.CorrectionStatus.FACULTY_REVIEW
-        ])
-    ).all()
-    return {"corrections": [_format_correction(c, include_student=True) for c in corrections]}
+    corrections = await mongo_db["attendance_corrections"].find({
+        "status": {"$in": ["pending", "faculty_review"]}
+    }).sort("created_at", -1).to_list(length=200)
+
+    for c in corrections:
+        c["id"] = str(c["_id"])
+        del c["_id"]
+
+    return {"corrections": corrections}
 
 
 @correction_router.post("/{correction_id}/approve")
 async def approve_correction(
-    correction_id: int,
+    correction_id: str,
     notes: Optional[str] = None,
     current_user: models.User = Depends(require_roles(
         models.UserRole.FACULTY, models.UserRole.ADVISOR, models.UserRole.HOD
     )),
-    db: Session = Depends(get_db)
+    mongo_db = Depends(get_db)
 ):
-    correction = db.query(models.AttendanceCorrection).filter(
-        models.AttendanceCorrection.id == correction_id
-    ).first()
+    from bson import ObjectId
+    if not ObjectId.is_valid(correction_id):
+        raise HTTPException(status_code=400, detail="Invalid correction ID")
+
+    correction = await mongo_db["attendance_corrections"].find_one({"_id": ObjectId(correction_id)})
     if not correction:
         raise HTTPException(status_code=404, detail="Correction not found")
 
-    # Update attendance
-    record = correction.attendance_record
-    prev_status = record.status
-    record.status = correction.claimed_status
-
-    correction.status = models.CorrectionStatus.APPROVED
-    if hasattr(current_user, "faculty_profile") and current_user.faculty_profile:
-        correction.reviewed_by_faculty_id = current_user.faculty_profile.id
-    correction.faculty_decision = "approved"
-    correction.faculty_notes = notes
-    correction.faculty_reviewed_at = datetime.now(timezone.utc)
-
-    audit = AuditService(db)
-    audit.log_attendance_change(
-        record, prev_status, correction.claimed_status,
-        current_user.id, current_user.role,
-        f"Correction approved: {notes}",
-        related_request_id=correction.id,
-        related_request_type="correction"
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await mongo_db["attendance_corrections"].update_one(
+        {"_id": ObjectId(correction_id)},
+        {"$set": {
+            "status": "approved",
+            "faculty_notes": notes,
+            "reviewed_by": current_user.full_name or current_user.login_id,
+            "reviewed_at": now_iso,
+            "updated_at": now_iso
+        }}
     )
 
-    # Notify student
-    notif = NotificationService(db)
-    notif.create_notification(
-        correction.student.user_id,
-        models.NotificationCategory.ATTENDANCE_CORRECTION,
-        "Correction Approved",
-        f"Your attendance correction for {record.subject.name if record.subject else ''} on {record.date} has been approved. Status changed to {correction.claimed_status}.",
-        priority=models.NotificationPriority.INFORMATION
-    )
+    await mongo_db["audit_logs"].insert_one({
+        "action": "CORRECTION_APPROVED",
+        "entity_type": "attendance_correction",
+        "entity_id": correction_id,
+        "user_id": str(current_user.id),
+        "user_role": str(current_user.role),
+        "reason": notes or "Approved",
+        "created_at": now_iso
+    })
 
-    db.commit()
     return {"message": "Correction approved"}
 
 
 @correction_router.post("/{correction_id}/reject")
 async def reject_correction(
-    correction_id: int,
+    correction_id: str,
     reason: str,
     current_user: models.User = Depends(require_roles(
         models.UserRole.FACULTY, models.UserRole.ADVISOR, models.UserRole.HOD
     )),
-    db: Session = Depends(get_db)
+    mongo_db = Depends(get_db)
 ):
-    correction = db.query(models.AttendanceCorrection).filter(
-        models.AttendanceCorrection.id == correction_id
-    ).first()
+    from bson import ObjectId
+    if not ObjectId.is_valid(correction_id):
+        raise HTTPException(status_code=400, detail="Invalid correction ID")
+
+    correction = await mongo_db["attendance_corrections"].find_one({"_id": ObjectId(correction_id)})
     if not correction:
         raise HTTPException(status_code=404, detail="Correction not found")
 
-    correction.status = models.CorrectionStatus.REJECTED
-    correction.faculty_decision = "rejected"
-    correction.faculty_notes = reason
-    correction.faculty_reviewed_at = datetime.now(timezone.utc)
-
-    notif = NotificationService(db)
-    notif.create_notification(
-        correction.student.user_id,
-        models.NotificationCategory.ATTENDANCE_CORRECTION,
-        "Correction Rejected",
-        f"Your attendance correction request was rejected. Reason: {reason}",
-        priority=models.NotificationPriority.ATTENTION
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await mongo_db["attendance_corrections"].update_one(
+        {"_id": ObjectId(correction_id)},
+        {"$set": {
+            "status": "rejected",
+            "faculty_notes": reason,
+            "reviewed_by": current_user.full_name or current_user.login_id,
+            "reviewed_at": now_iso,
+            "updated_at": now_iso
+        }}
     )
 
-    db.commit()
+    await mongo_db["audit_logs"].insert_one({
+        "action": "CORRECTION_REJECTED",
+        "entity_type": "attendance_correction",
+        "entity_id": correction_id,
+        "user_id": str(current_user.id),
+        "user_role": str(current_user.role),
+        "reason": reason,
+        "created_at": now_iso
+    })
+
     return {"message": "Correction rejected"}
-
-
-def _format_correction(c, include_student=False):
-    result = {
-        "id": c.id,
-        "attendance_record_id": c.attendance_record_id,
-        "current_status": c.current_status,
-        "claimed_status": c.claimed_status,
-        "explanation": c.explanation,
-        "status": c.status,
-        "faculty_decision": c.faculty_decision,
-        "faculty_notes": c.faculty_notes,
-        "created_at": c.created_at,
-        "record": {
-            "date": c.attendance_record.date if c.attendance_record else None,
-            "period_number": c.attendance_record.period_number if c.attendance_record else None,
-            "subject_name": c.attendance_record.subject.name if c.attendance_record and c.attendance_record.subject else None
-        } if c.attendance_record else None
-    }
-    if include_student and c.student:
-        result["student"] = {
-            "id": c.student.id,
-            "register_number": c.student.register_number,
-            "name": c.student.user.full_name
-        }
-    return result
 
 
 # ============================================================
@@ -620,66 +574,64 @@ async def get_notifications(
     page: int = Query(1, ge=1),
     limit: int = Query(20, le=100),
     current_user: models.User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    mongo_db = Depends(get_db)
 ):
-    query = db.query(models.Notification).filter(
-        models.Notification.user_id == current_user.id
-    )
+    query_filter = {"user_id": str(current_user.id)}
     if unread_only:
-        query = query.filter(models.Notification.is_read == False)
+        query_filter["is_read"] = False
     if category:
-        query = query.filter(models.Notification.category == category)
+        query_filter["category"] = category
 
-    total = query.count()
-    notifications = query.order_by(
-        models.Notification.created_at.desc()
-    ).offset((page - 1) * limit).limit(limit).all()
+    total = await mongo_db["notifications"].count_documents(query_filter)
+    unread_count = await mongo_db["notifications"].count_documents({
+        "user_id": str(current_user.id), "is_read": False
+    })
+
+    skip = (page - 1) * limit
+    notifications = await mongo_db["notifications"].find(query_filter).sort(
+        "created_at", -1
+    ).skip(skip).limit(limit).to_list(length=limit)
+
+    for n in notifications:
+        n["id"] = str(n["_id"])
+        del n["_id"]
 
     return {
         "total": total,
-        "unread_count": db.query(models.Notification).filter(
-            models.Notification.user_id == current_user.id,
-            models.Notification.is_read == False
-        ).count(),
-        "notifications": [
-            {
-                "id": n.id, "category": n.category, "priority": n.priority,
-                "title": n.title, "message": n.message,
-                "reference_type": n.reference_type, "reference_id": n.reference_id,
-                "is_read": n.is_read, "created_at": n.created_at
-            } for n in notifications
-        ]
+        "unread_count": unread_count,
+        "notifications": notifications
     }
 
 
 @notif_router.post("/{notif_id}/read")
 async def mark_notification_read(
-    notif_id: int,
+    notif_id: str,
     current_user: models.User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    mongo_db = Depends(get_db)
 ):
-    notif = db.query(models.Notification).filter(
-        models.Notification.id == notif_id,
-        models.Notification.user_id == current_user.id
-    ).first()
-    if not notif:
+    from bson import ObjectId
+    if not ObjectId.is_valid(notif_id):
+        raise HTTPException(status_code=400, detail="Invalid notification ID")
+
+    result = await mongo_db["notifications"].update_one(
+        {"_id": ObjectId(notif_id), "user_id": str(current_user.id)},
+        {"$set": {"is_read": True, "read_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Notification not found")
-    notif.is_read = True
-    notif.read_at = datetime.now(timezone.utc)
-    db.commit()
     return {"message": "Marked as read"}
 
 
 @notif_router.post("/read-all")
 async def mark_all_read(
     current_user: models.User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    mongo_db = Depends(get_db)
 ):
-    db.query(models.Notification).filter(
-        models.Notification.user_id == current_user.id,
-        models.Notification.is_read == False
-    ).update({"is_read": True, "read_at": datetime.now(timezone.utc)})
-    db.commit()
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await mongo_db["notifications"].update_many(
+        {"user_id": str(current_user.id), "is_read": False},
+        {"$set": {"is_read": True, "read_at": now_iso}}
+    )
     return {"message": "All notifications marked as read"}
 
 
@@ -692,90 +644,68 @@ timetable_router = APIRouter(prefix="/timetable", tags=["Timetable"])
 @timetable_router.get("/today")
 async def get_today_timetable(
     current_user: models.User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    mongo_db = Depends(get_db)
 ):
     day_of_week = datetime.now().weekday()
+    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-    if current_user.role == models.UserRole.STUDENT:
-        student = current_user.student_profile
-        if not student:
-            raise HTTPException(status_code=404, detail="Student profile not found")
-        section_id = student.section_id
-    elif current_user.role in [models.UserRole.FACULTY, models.UserRole.ADVISOR]:
-        # Return faculty's classes today
-        faculty = current_user.faculty_profile
-        if not faculty:
-            raise HTTPException(status_code=404, detail="Faculty profile not found")
-        entries = db.query(models.TimetableEntry).filter(
-            models.TimetableEntry.faculty_id == faculty.id,
-            models.TimetableEntry.day_of_week == day_of_week,
-            models.TimetableEntry.is_active == True
-        ).order_by(models.TimetableEntry.period_number).all()
-        return {"day": day_of_week, "timetable": [_format_tt(e) for e in entries]}
-    else:
-        return {"day": day_of_week, "timetable": []}
+    # Fetch student info to determine section
+    student_doc = None
+    if "STUDENT" in str(current_user.role).upper():
+        student_doc = await mongo_db["student_accounts"].find_one({
+            "$or": [
+                {"register_no": current_user.login_id},
+                {"roll_number": current_user.login_id}
+            ]
+        })
 
-    entries = db.query(models.TimetableEntry).filter(
-        models.TimetableEntry.section_id == section_id,
-        models.TimetableEntry.day_of_week == day_of_week,
-        models.TimetableEntry.is_active == True
-    ).order_by(models.TimetableEntry.period_number).all()
+    section = student_doc.get("section", "AIML") if student_doc else None
 
-    now_time = datetime.now().time()
-    result = []
+    timetable_query = {"day_of_week": day_of_week}
+    if section:
+        timetable_query["section"] = section
+
+    entries = await mongo_db["timetables"].find(timetable_query).sort("period_number", 1).to_list(length=50)
     for e in entries:
-        tt = _format_tt(e)
-        tt["is_current"] = e.start_time <= now_time <= e.end_time
-        result.append(tt)
+        e["id"] = str(e["_id"])
+        del e["_id"]
 
-    return {"day": day_of_week, "timetable": result}
+    return {"day": day_of_week, "day_name": day_names[day_of_week], "timetable": entries}
 
 
 @timetable_router.get("/week")
 async def get_week_timetable(
-    section_id: Optional[int] = None,
+    section_id: Optional[str] = None,
     current_user: models.User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    mongo_db = Depends(get_db)
 ):
-    if section_id is None and current_user.role == models.UserRole.STUDENT:
-        section_id = current_user.student_profile.section_id
-
-    query = db.query(models.TimetableEntry).filter(
-        models.TimetableEntry.is_active == True
-    )
+    query_filter = {}
     if section_id:
-        query = query.filter(models.TimetableEntry.section_id == section_id)
+        query_filter["section"] = section_id
+    elif "STUDENT" in str(current_user.role).upper():
+        student_doc = await mongo_db["student_accounts"].find_one({
+            "$or": [
+                {"register_no": current_user.login_id},
+                {"roll_number": current_user.login_id}
+            ]
+        })
+        if student_doc:
+            query_filter["section"] = student_doc.get("section", "AIML")
 
-    entries = query.order_by(
-        models.TimetableEntry.day_of_week,
-        models.TimetableEntry.period_number
-    ).all()
+    entries = await mongo_db["timetables"].find(query_filter).sort(
+        [("day_of_week", 1), ("period_number", 1)]
+    ).to_list(length=200)
 
     week = {}
     for e in entries:
-        day = e.day_of_week
+        e["id"] = str(e["_id"])
+        del e["_id"]
+        day = str(e.get("day_of_week", 0))
         if day not in week:
             week[day] = []
-        week[day].append(_format_tt(e))
+        week[day].append(e)
 
     return {"week": week}
-
-
-def _format_tt(e: models.TimetableEntry):
-    return {
-        "id": e.id,
-        "day_of_week": e.day_of_week,
-        "period_number": e.period_number,
-        "start_time": str(e.start_time),
-        "end_time": str(e.end_time),
-        "subject_id": e.subject_id,
-        "subject_name": e.subject.name if e.subject else None,
-        "subject_code": e.subject.code if e.subject else None,
-        "faculty_id": e.faculty_id,
-        "faculty_name": e.faculty.user.full_name if e.faculty and e.faculty.user else None,
-        "section_id": e.section_id,
-        "room": e.room
-    }
 
 
 # ============================================================
@@ -787,54 +717,31 @@ audit_router = APIRouter(prefix="/audit", tags=["Audit Logs"])
 @audit_router.get("/")
 async def get_audit_logs(
     entity_type: Optional[str] = None,
-    entity_id: Optional[int] = None,
-    user_id: Optional[int] = None,
+    entity_id: Optional[str] = None,
+    user_id: Optional[str] = None,
     page: int = Query(1, ge=1),
     limit: int = Query(50, le=200),
     current_user: models.User = Depends(require_roles(
         models.UserRole.HOD, models.UserRole.DEO, models.UserRole.ADVISOR
     )),
-    db: Session = Depends(get_db)
+    mongo_db = Depends(get_db)
 ):
-    query = db.query(models.AuditLog)
+    query_filter = {}
     if entity_type:
-        query = query.filter(models.AuditLog.entity_type == entity_type)
+        query_filter["entity_type"] = entity_type
     if entity_id:
-        query = query.filter(models.AuditLog.entity_id == entity_id)
+        query_filter["entity_id"] = entity_id
     if user_id:
-        query = query.filter(models.AuditLog.user_id == user_id)
+        query_filter["user_id"] = user_id
 
-    total = query.count()
-    logs = query.order_by(models.AuditLog.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
+    total = await mongo_db["audit_logs"].count_documents(query_filter)
+    skip = (page - 1) * limit
+    logs = await mongo_db["audit_logs"].find(query_filter).sort(
+        "created_at", -1
+    ).skip(skip).limit(limit).to_list(length=limit)
 
-    return {
-        "total": total,
-        "logs": [
-            {
-                "id": l.id, "action": l.action, "entity_type": l.entity_type,
-                "entity_id": l.entity_id, "user_id": l.user_id, "user_role": l.user_role,
-                "previous_value": l.previous_value, "new_value": l.new_value,
-                "reason": l.reason, "created_at": l.created_at
-            } for l in logs
-        ]
-    }
+    for log in logs:
+        log["id"] = str(log["_id"])
+        del log["_id"]
 
-
-# ============================================================
-# HELPER
-# ============================================================
-async def _save_upload(file: UploadFile, subfolder: str) -> str:
-    upload_dir = os.path.join(settings.UPLOAD_DIR, subfolder)
-    os.makedirs(upload_dir, exist_ok=True)
-    ext = os.path.splitext(file.filename)[-1].lower()
-    filename = f"{uuid.uuid4()}{ext}"
-    file_path = os.path.join(upload_dir, filename)
-    content = await file.read()
-    with open(file_path, "wb") as f:
-        f.write(content)
-    return file_path
-
-
-def _get_setting(db: Session, key: str, default: str) -> str:
-    setting = db.query(models.Setting).filter(models.Setting.key == key).first()
-    return setting.value if setting else default
+    return {"total": total, "logs": logs}

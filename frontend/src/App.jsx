@@ -8,17 +8,19 @@ import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
 
 // Pages
-import LoginPage from './pages/LoginPage';
+import AuthFlowPage from './pages/AuthFlowPage';
+import ProfilePage from './pages/ProfilePage';
 import StudentDashboard from './pages/StudentDashboard';
 import AttendancePage from './pages/AttendancePage';
 import PlannerPage from './pages/PlannerPage';
 import ODPage from './pages/ODPage';
 import LeavePage from './pages/LeavePage';
 import { LateArrivalPage, CorrectionPage } from './pages/RequestPages';
-import { HODDashboard, FacultyDashboard, DEODashboard } from './pages/RoleDashboards';
+import { HODDashboard, FacultyDashboard, DEODashboard, AdvisorDashboard } from './pages/RoleDashboards';
 import { ReportsPage, AuditPage, ERPPage, SettingsPage } from './pages/AdminPages';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import StudentImportPage from './pages/StudentImportPage';
+import { StudentsListPage, FacultyListPage, NotificationsPage, TimetablePage, ClassesPage, StaffDashboard } from './pages/StaffPages';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,6 +34,7 @@ const queryClient = new QueryClient({
 
 const PAGE_TITLES = {
   '/dashboard': 'Dashboard',
+  '/profile': 'User Profile',
   '/attendance': 'My Attendance',
   '/planner': 'Smart Planner',
   '/od': 'OD Requests',
@@ -62,6 +65,7 @@ function AppLayout() {
         <div className="page-content" style={{ padding: 0 }}>
           <Routes>
             <Route path="/dashboard" element={<DashboardByRole />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/attendance" element={<AttendancePage />} />
             <Route path="/planner" element={<PlannerPage />} />
             <Route path="/od" element={<ODPage />} />
@@ -74,6 +78,11 @@ function AppLayout() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/import-students" element={<StudentImportPage />} />
             <Route path="/change-password" element={<ChangePasswordPage />} />
+            <Route path="/students" element={<StudentsListPage />} />
+            <Route path="/faculty" element={<FacultyListPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="/timetable" element={<TimetablePage />} />
+            <Route path="/classes" element={<ClassesPage />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>
@@ -87,9 +96,10 @@ function DashboardByRole() {
   switch (user?.role) {
     case 'student': return <StudentDashboard />;
     case 'faculty': return <FacultyDashboard />;
-    case 'advisor': return <HODDashboard />;
+    case 'advisor': return <AdvisorDashboard />;
     case 'hod': return <HODDashboard />;
     case 'deo': return <DEODashboard />;
+    case 'staff': return <StaffDashboard />;
     default: return <StudentDashboard />;
   }
 }
@@ -163,7 +173,7 @@ function LoginRedirect() {
   const { user, loading } = useAuth();
   if (loading) return null;
   if (user) return <Navigate to="/dashboard" replace />;
-  return <LoginPage />;
+  return <AuthFlowPage />;
 }
 
 export default App;

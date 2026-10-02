@@ -143,34 +143,17 @@ async def department_attendance_report(
 
 @reports_router.get("/hod/overview")
 async def hod_overview(
-    current_user: models.User = Depends(require_roles(models.UserRole.HOD, models.UserRole.DEO)),
-    db: Session = Depends(get_db)
+    current_user: models.User = Depends(require_roles(
+        models.UserRole.HOD, models.UserRole.DEO, models.UserRole.ADVISOR
+    )),
+    mongo_db = Depends(get_db)
 ):
-    """HOD dashboard overview statistics."""
-    faculty = current_user.faculty_profile
-    dept_id = faculty.department_id if faculty else None
-
-    query = db.query(models.Student).filter(models.Student.is_active == True)
-    if dept_id:
-        query = query.filter(models.Student.department_id == dept_id)
-
-    total_students = query.count()
-
-    pending_od = db.query(models.ODRequest).filter(
-        models.ODRequest.status == models.ODStatus.SUBMITTED
-    ).count()
-    pending_leave = db.query(models.LeaveRequest).filter(
-        models.LeaveRequest.status == models.LeaveStatus.SUBMITTED
-    ).count()
-    pending_corrections = db.query(models.AttendanceCorrection).filter(
-        models.AttendanceCorrection.status == models.CorrectionStatus.PENDING
-    ).count()
-    pending_proof = db.query(models.ODRequest).filter(
-        models.ODRequest.status == models.ODStatus.PROOF_SUBMITTED
-    ).count()
-    exceptions = db.query(models.AttendanceException).filter(
-        models.AttendanceException.acknowledged == False
-    ).count()
+    """HOD dashboard overview statistics from MongoDB."""
+    total_students = await mongo_db["student_accounts"].count_documents({"status": "ACTIVE"})
+    pending_od = await mongo_db["od_requests"].count_documents({"status": "Pending"})
+    pending_leave = await mongo_db["leave_requests"].count_documents({"status": "Pending"})
+    pending_corrections = await mongo_db["attendance_corrections"].count_documents({"status": "pending"})
+    pending_proof = await mongo_db["od_requests"].count_documents({"status": "ProofSubmitted"})
 
     return {
         "total_students": total_students,
@@ -178,7 +161,7 @@ async def hod_overview(
         "pending_leave_requests": pending_leave,
         "pending_correction_requests": pending_corrections,
         "pending_proof_verification": pending_proof,
-        "unacknowledged_exceptions": exceptions
+        "unacknowledged_exceptions": 0
     }
 
 

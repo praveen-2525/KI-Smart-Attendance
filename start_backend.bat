@@ -21,7 +21,7 @@ pip install -r requirements.txt -q
 :: Check if DB exists, if not seed it
 if not exist "ki_attendance.db" (
     echo First run detected - seeding demo database...
-    python scripts/seed_db.py
+    python scripts/seed_mongo.py
 )
 
 echo.

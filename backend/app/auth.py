@@ -5,7 +5,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from sqlalchemy.orm import Session
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.config import settings
@@ -73,7 +72,7 @@ async def get_current_user(
     if user_id is None or not login_id:
         raise credentials_exception
 
-    # Query MongoDB student_accounts or users
+    # Query MongoDB student_accounts, staff_accounts, or users
     mongo_user = await mongo_db["student_accounts"].find_one({
         "$or": [
             {"register_no": login_id},
@@ -83,6 +82,14 @@ async def get_current_user(
     })
     
     if not mongo_user:
+        mongo_user = await mongo_db["staff_accounts"].find_one({
+            "$or": [
+                {"email": login_id.lower()},
+                {"login_id": login_id}
+            ]
+        })
+        
+    if not mongo_user:
         mongo_user = await mongo_db["users"].find_one({"login_id": login_id})
         
     if not mongo_user:
@@ -91,10 +98,12 @@ async def get_current_user(
     import hashlib
     num_id = int(hashlib.md5(str(mongo_user["_id"]).encode()).hexdigest(), 16) % (10 ** 8)
     
+    user_role = (role or mongo_user.get("role", "STUDENT")).lower()
+
     user = models.User(
         id=num_id,
         login_id=login_id,
-        role=role or mongo_user.get("role", "STUDENT"),
+        role=user_role,
         full_name=mongo_user.get("name", "User"),
         email=mongo_user.get("email", ""),
         is_active=mongo_user.get("status", "ACTIVE") == "ACTIVE"
@@ -108,10 +117,12 @@ async def get_current_user(
 def require_roles(*roles: models.UserRole):
     """Role-based access control decorator factory."""
     async def role_checker(current_user: models.User = Depends(get_current_user)):
-        if current_user.role not in roles:
+        allowed = [r.value.lower() if hasattr(r, "value") else str(r).lower() for r in roles]
+        user_r = str(current_user.role).lower()
+        if user_r not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Access denied. Required roles: {[r.value for r in roles]}"
+                detail=f"Access denied. Required roles: {allowed}"
             )
         return current_user
     return role_checker
@@ -119,8 +130,10 @@ def require_roles(*roles: models.UserRole):
 
 # Convenience role dependencies
 get_student_user = require_roles(models.UserRole.STUDENT)
+get_staff_user = require_roles(models.UserRole.STAFF, models.UserRole.FACULTY, models.UserRole.ADVISOR, models.UserRole.HOD, models.UserRole.DEO)
 get_faculty_user = require_roles(models.UserRole.FACULTY, models.UserRole.ADVISOR, models.UserRole.HOD, models.UserRole.DEO)
 get_advisor_user = require_roles(models.UserRole.ADVISOR, models.UserRole.HOD, models.UserRole.DEO)
 get_hod_user = require_roles(models.UserRole.HOD, models.UserRole.DEO)
 get_deo_user = require_roles(models.UserRole.DEO)
 get_any_authenticated = get_current_user
+
