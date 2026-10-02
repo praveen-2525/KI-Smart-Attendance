@@ -189,7 +189,7 @@ async def import_students(
     file: UploadFile = File(...),
     confirm: bool = Form(False),
     # Skipping role check for migration phase, or could add an async auth dependency later
-    mongo_db = Depends(get_mongo_db)
+    mongo_db = Depends(get_db)
 ):
     import csv
     import io
@@ -454,24 +454,24 @@ async def list_subjects(
 
 
 @admin_router.get("/config/departments")
-async def get_mongo_departments(mongo_db = Depends(get_mongo_db)):
+async def get_mongo_departments(mongo_db = Depends(get_db)):
     depts = list(mongo_db["departments"].find({}, {"_id": 0}))
     return {"departments": depts}
 
 @admin_router.get("/config/years")
-async def get_mongo_years(mongo_db = Depends(get_mongo_db)):
+async def get_mongo_years(mongo_db = Depends(get_db)):
     years = list(mongo_db["years"].find({}, {"_id": 0}))
     return {"years": years}
 
 @admin_router.get("/config/sections")
-async def get_mongo_sections(mongo_db = Depends(get_mongo_db)):
+async def get_mongo_sections(mongo_db = Depends(get_db)):
     sections = list(mongo_db["sections"].find({}, {"_id": 0}))
     return {"sections": sections}
 
 @admin_router.post("/config/sections")
 async def add_mongo_section(
     data: dict, # expecting { department_code, year, section_name }
-    mongo_db = Depends(get_mongo_db)
+    mongo_db = Depends(get_db)
 ):
     new_section = {
         "department_code": data["department_code"],
@@ -485,7 +485,7 @@ async def add_mongo_section(
 @admin_router.put("/config/sections/{section_name}/toggle")
 async def toggle_mongo_section(
     section_name: str,
-    mongo_db = Depends(get_mongo_db)
+    mongo_db = Depends(get_db)
 ):
     section = mongo_db["sections"].find_one({"section_name": section_name})
     if not section:

@@ -51,7 +51,7 @@ def verify_token(token: str) -> Optional[dict]:
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
+    mongo_db = Depends(get_db)
 ) -> models.User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -70,31 +70,35 @@ async def get_current_user(
     login_id = payload.get("login_id")
     role = payload.get("role")
     
-    if user_id is None:
+    if user_id is None or not login_id:
         raise credentials_exception
 
-    user = db.query(models.User).filter(models.User.id == int(user_id)).first()
-    if user is None:
-        # Check MongoDB using login_id
-        if login_id:
-            from app.database import client
-            from app.config import settings
-            mongo_db = client[settings.MONGODB_DB_NAME]
-            
-            mongo_user = mongo_db["student_accounts"].find_one({"register_no": login_id})
-            if not mongo_user:
-                mongo_user = mongo_db["users"].find_one({"login_id": login_id})
-                
-            if mongo_user:
-                import hashlib
-                num_id = int(hashlib.md5(str(mongo_user["_id"]).encode()).hexdigest(), 16) % (10 ** 8)
-                return models.User(
-                    id=num_id,
-                    login_id=login_id,
-                    role=role,
-                    is_active=mongo_user.get("status", "ACTIVE") == "ACTIVE"
-                )
+    # Query MongoDB student_accounts or users
+    mongo_user = await mongo_db["student_accounts"].find_one({
+        "$or": [
+            {"register_no": login_id},
+            {"roll_number": login_id},
+            {"email": login_id.lower()}
+        ]
+    })
+    
+    if not mongo_user:
+        mongo_user = await mongo_db["users"].find_one({"login_id": login_id})
+        
+    if not mongo_user:
         raise credentials_exception
+
+    import hashlib
+    num_id = int(hashlib.md5(str(mongo_user["_id"]).encode()).hexdigest(), 16) % (10 ** 8)
+    
+    user = models.User(
+        id=num_id,
+        login_id=login_id,
+        role=role or mongo_user.get("role", "STUDENT"),
+        full_name=mongo_user.get("name", "User"),
+        email=mongo_user.get("email", ""),
+        is_active=mongo_user.get("status", "ACTIVE") == "ACTIVE"
+    )
         
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is disabled")

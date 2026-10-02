@@ -13,6 +13,7 @@ export default function LoginPage() {
   
   // Register state
   const [regData, setRegData] = useState({
+    roll_number: '',
     register_no: '',
     name: '',
     date_of_birth: '',
@@ -24,69 +25,115 @@ export default function LoginPage() {
     password: '',
     confirm_password: ''
   });
-  const [regStep, setRegStep] = useState(1);
-  
+  const [errors, setErrors] = useState({});
+  const [loginError, setLoginError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const demoAccounts = [
-    { label: 'Student', id: 'student001', pwd: 'STU@12345', color: '#6366f1' },
-    { label: 'Faculty', id: 'fac002', pwd: 'FAC@12345', color: '#10b981' },
-    { label: 'Advisor', id: 'adv001', pwd: 'ADV@12345', color: '#f59e0b' },
-    { label: 'HOD', id: 'hod001', pwd: 'HOD@12345', color: '#8b5cf6' },
-    { label: 'DEO', id: 'deo001', pwd: 'DEO@12345', color: '#ef4444' },
-  ];
+  const validateLogin = () => {
+    if (!loginId.trim()) {
+      setLoginError("Login ID is required. Enter your Roll Number, Register Number or College Email.");
+      return false;
+    }
+    
+    if (!password) {
+      setLoginError("Password is required.");
+      return false;
+    }
+    
+    // Check if it's one of the 3 formats
+    const isRoll = /^[0-9]{2}AIM[0-9]{3}$/.test(loginId);
+    const isReg = /^[0-9]{12}$/.test(loginId);
+    const isEmail = loginId.includes('@');
+    
+    if (!isRoll && !isReg && !isEmail) {
+      setLoginError("Enter a valid Roll Number, 12-digit Register Number or College Email.");
+      return false;
+    }
+    
+    setLoginError('');
+    return true;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!validateLogin()) return;
+    
     setLoading(true);
+    setLoginError('');
     try {
       await login(loginId, password);
       toast.success('Login successful!');
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Invalid credentials');
+      const detail = err.response?.data?.detail;
+      if (detail) {
+        setLoginError(detail);
+      } else {
+        setLoginError('Authentication service is currently unavailable. Please try again later.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleVerifyStudent = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const res = await fetch('http://localhost:8000/api/v1/auth/verify-student', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ register_no: regData.register_no })
-      });
-      const data = await res.json();
-      
-      if (!res.ok) {
-        toast.error(data.detail || 'Verification failed');
-      } else {
-        setRegData({
-          ...regData,
-          name: data.name,
-          date_of_birth: data.date_of_birth,
-          department: data.department,
-          year: data.year,
-          section: data.section
-        });
-        setRegStep(2);
-        toast.success("Student verified successfully");
+  const validateRegister = (field = null) => {
+    let errs = { ...errors };
+    let isValid = true;
+    
+    const validateField = (name, value) => {
+      switch (name) {
+        case 'roll_number':
+          if (!value) return "Roll Number is required.";
+          if (value.length !== 8) return "Roll Number must contain exactly 8 characters.";
+          if (!/^[0-9]{2}AIM[0-9]{3}$/.test(value)) return "Use uppercase AIM. Example: 24AIM040.";
+          return "";
+        case 'register_no':
+          if (!value) return "Register Number is required.";
+          if (/[a-zA-Z\s-]/.test(value)) return "Register Number can contain numbers only.";
+          if (value.length !== 12 || !/^[0-9]{12}$/.test(value)) return "Register Number must contain exactly 12 digits.";
+          return "";
+        case 'name':
+          if (!value.trim()) return "Full Name is required.";
+          if (!/^[a-zA-Z\s]+$/.test(value)) return "Enter a valid full name (letters and spaces only).";
+          return "";
+        case 'date_of_birth':
+          if (!value) return "Enter a valid date of birth.";
+          return "";
+        case 'email':
+          if (!value.trim()) return "College Email is required.";
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return "Enter a valid college email address.";
+          return "";
+        case 'phone':
+          if (!value) return "Mobile Number is required.";
+          if (/[a-zA-Z\s-]/.test(value)) return "Mobile Number can contain numbers only.";
+          if (value.length !== 10 || !/^[0-9]{10}$/.test(value)) return "Mobile Number must contain exactly 10 digits.";
+          return "";
+        case 'password':
+          if (!value) return "Password is required.";
+          if (value.length < 8) return "Password must contain at least 8 characters.";
+          return "";
+        case 'confirm_password':
+          if (value !== regData.password) return "Passwords do not match.";
+          return "";
+        default: return "";
       }
-    } catch (err) {
-      toast.error('Verification error');
-    } finally {
-      setLoading(false);
+    };
+
+    if (field) {
+      errs[field] = validateField(field, regData[field]);
+    } else {
+      Object.keys(regData).forEach(key => {
+        errs[key] = validateField(key, regData[key]);
+      });
     }
+
+    setErrors(errs);
+    return Object.values(errs).every(x => x === "");
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    if (regData.password !== regData.confirm_password) {
-      toast.error("Passwords do not match");
-      return;
-    }
+    if (!validateRegister()) return;
+    
     setLoading(true);
     try {
       const res = await fetch('http://localhost:8000/api/v1/auth/register', {
@@ -97,31 +144,31 @@ export default function LoginPage() {
       const data = await res.json();
       
       if (!res.ok) {
-        toast.error(data.detail || 'Registration failed');
+        // Simple heuristic to attach backend errors to specific fields if possible
+        const detail = data.detail || '';
+        if (detail.includes('Roll Number')) setErrors(prev => ({...prev, roll_number: detail}));
+        else if (detail.includes('Register Number')) setErrors(prev => ({...prev, register_no: detail}));
+        else if (detail.includes('Email')) setErrors(prev => ({...prev, email: detail}));
+        else toast.error(detail || 'Registration failed');
       } else {
-        toast.success('Registration successful! Please login.');
+        toast.success('Registration successful!');
         setActiveTab('login');
-        setRegStep(1);
-        setLoginId(regData.register_no);
+        setLoginId(regData.roll_number || regData.register_no);
         setPassword('');
       }
     } catch (err) {
-      toast.error('An error occurred during registration');
+      toast.error('Authentication service is currently unavailable. Please try again later.');
     } finally {
       setLoading(false);
     }
   };
 
-  const resetRegister = () => {
-    setActiveTab('register');
-    setRegStep(1);
-    setRegData({...regData, register_no: ''});
-  };
-
-  const fillDemo = (acc) => {
-    setActiveTab('login');
-    setLoginId(acc.id);
-    setPassword(acc.pwd);
+  const handleInputChange = (field, value) => {
+    setRegData(prev => ({ ...prev, [field]: value }));
+    // Clear error for that field when typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
   };
 
   return (
@@ -151,7 +198,6 @@ export default function LoginPage() {
             Smart Attendance, Smarter Student Management
           </p>
 
-          {/* Feature highlights */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'left' }}>
             {[
               { icon: '📊', title: 'Smart Attendance Planner', desc: 'Calculate classes needed to reach 75%' },
@@ -178,13 +224,13 @@ export default function LoginPage() {
 
       {/* Right panel - Login form */}
       <div className="login-right">
-        <div className="login-card" style={{ width: '100%', maxWidth: '420px', padding: '32px 40px' }}>
+        <div className="login-card" style={{ width: '100%', maxWidth: '460px', padding: '32px 40px' }}>
           <h1 className="login-logo">KI Smart Attendance+</h1>
           <p className="login-tagline">Access your account</p>
 
           <div style={{ display: 'flex', gap: 10, marginBottom: 24, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
             <button 
-              onClick={() => setActiveTab('login')}
+              onClick={() => { setActiveTab('login'); setLoginError(''); }}
               style={{
                 background: 'none', border: 'none', padding: '8px 16px', cursor: 'pointer',
                 color: activeTab === 'login' ? 'var(--primary-400)' : 'var(--gray-500)',
@@ -195,7 +241,7 @@ export default function LoginPage() {
               LOGIN
             </button>
             <button 
-              onClick={() => { setActiveTab('register'); setRegStep(1); }}
+              onClick={() => setActiveTab('register')}
               style={{
                 background: 'none', border: 'none', padding: '8px 16px', cursor: 'pointer',
                 color: activeTab === 'register' ? 'var(--primary-400)' : 'var(--gray-500)',
@@ -209,20 +255,19 @@ export default function LoginPage() {
 
           {activeTab === 'login' ? (
             <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label className="form-label">Register Number / Login ID</label>
+              <div className="form-group mb-4">
+                <label className="form-label">Login ID</label>
                 <input
                   type="text"
-                  className="form-input"
-                  placeholder="Enter your login ID"
+                  className={`form-input ${loginError && !password ? 'error-input' : ''}`}
+                  placeholder="Enter Roll Number, Register Number or College Email"
                   value={loginId}
-                  onChange={(e) => setLoginId(e.target.value)}
-                  required
+                  onChange={(e) => { setLoginId(e.target.value); setLoginError(''); }}
                   autoComplete="username"
                 />
               </div>
 
-              <div className="form-group">
+              <div className="form-group mb-2">
                 <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
                   Password
                   <a href="#" style={{ color: 'var(--primary-400)', fontSize: 12, textDecoration: 'none' }}>Forgot Password?</a>
@@ -230,11 +275,10 @@ export default function LoginPage() {
                 <div style={{ position: 'relative' }}>
                   <input
                     type={showPwd ? 'text' : 'password'}
-                    className="form-input"
+                    className={`form-input ${loginError && password ? 'error-input' : ''}`}
                     placeholder="Enter your password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
+                    onChange={(e) => { setPassword(e.target.value); setLoginError(''); }}
                     autoComplete="current-password"
                     style={{ paddingRight: 44 }}
                   />
@@ -251,6 +295,12 @@ export default function LoginPage() {
                   </button>
                 </div>
               </div>
+              
+              {loginError && (
+                <div style={{ color: '#ef4444', fontSize: 12, marginBottom: 16 }}>
+                  {loginError}
+                </div>
+              )}
 
               <button
                 type="submit"
@@ -262,87 +312,79 @@ export default function LoginPage() {
                 {' '}{loading ? 'Signing in...' : 'Sign In'}
               </button>
             </form>
-          ) : regStep === 1 ? (
-            <form onSubmit={handleVerifyStudent}>
-              <div className="form-group mb-4">
-                <label className="form-label">Register Number</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  placeholder="e.g. 24AIM040"
-                  required 
-                  value={regData.register_no} 
-                  onChange={e => setRegData({...regData, register_no: e.target.value.trim()})} 
-                />
-                <div style={{fontSize: 11, color: 'var(--gray-500)', marginTop: 8}}>
-                  We will verify this number against authorized college records.
-                </div>
-              </div>
-              <button type="submit" className="btn btn-primary w-full" disabled={loading} style={{ height: 46 }}>
-                {loading ? <span className="spinner" /> : 'Verify Student'}
-              </button>
-            </form>
           ) : (
             <form onSubmit={handleRegister}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-                <span style={{ fontSize: 12, color: 'var(--gray-400)' }}>Authorized Details</span>
-                <a href="#" onClick={(e) => { e.preventDefault(); resetRegister(); }} style={{ fontSize: 12, color: 'var(--primary-400)', textDecoration: 'none' }}>Change Register No</a>
-              </div>
-              
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div className="form-group mb-3">
-                  <label className="form-label">Register No.</label>
-                  <input type="text" className="form-input" disabled value={regData.register_no} style={{opacity: 0.7}} />
+                  <label className="form-label">Roll Number</label>
+                  <input type="text" className={`form-input ${errors.roll_number ? 'error-input' : ''}`} placeholder="e.g. 24AIM040" value={regData.roll_number} onChange={e => handleInputChange('roll_number', e.target.value.trim())} onBlur={() => validateRegister('roll_number')} />
+                  {errors.roll_number && <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>{errors.roll_number}</div>}
                 </div>
                 <div className="form-group mb-3">
-                  <label className="form-label">Full Name</label>
-                  <input type="text" className="form-input" disabled value={regData.name} style={{opacity: 0.7}} />
+                  <label className="form-label">Register No.</label>
+                  <input type="text" className={`form-input ${errors.register_no ? 'error-input' : ''}`} placeholder="12 digits" value={regData.register_no} onChange={e => handleInputChange('register_no', e.target.value.trim())} onBlur={() => validateRegister('register_no')} />
+                  {errors.register_no && <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>{errors.register_no}</div>}
                 </div>
+              </div>
+
+              <div className="form-group mb-3">
+                <label className="form-label">Full Name</label>
+                <input type="text" className={`form-input ${errors.name ? 'error-input' : ''}`} placeholder="e.g. Praveen S" value={regData.name} onChange={e => handleInputChange('name', e.target.value)} onBlur={() => validateRegister('name')} />
+                {errors.name && <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>{errors.name}</div>}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div className="form-group mb-3">
                   <label className="form-label">DOB</label>
-                  <input type="text" className="form-input" disabled value={regData.date_of_birth} style={{opacity: 0.7}} />
+                  <input type="date" className={`form-input ${errors.date_of_birth ? 'error-input' : ''}`} value={regData.date_of_birth} onChange={e => handleInputChange('date_of_birth', e.target.value)} onBlur={() => validateRegister('date_of_birth')} />
+                  {errors.date_of_birth && <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>{errors.date_of_birth}</div>}
                 </div>
                 <div className="form-group mb-3">
                   <label className="form-label">Department</label>
-                  <input type="text" className="form-input" disabled value={regData.department} style={{opacity: 0.7}} />
+                  <select className="form-input" value={regData.department} onChange={e => handleInputChange('department', e.target.value)}>
+                    <option>CSE(AI&ML)</option>
+                  </select>
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div className="form-group mb-3">
                   <label className="form-label">Year</label>
-                  <input type="text" className="form-input" disabled value={regData.year} style={{opacity: 0.7}} />
+                  <select className="form-input" value={regData.year} onChange={e => handleInputChange('year', e.target.value)}>
+                    <option>III</option>
+                  </select>
                 </div>
                 <div className="form-group mb-3">
                   <label className="form-label">Section</label>
-                  <input type="text" className="form-input" disabled value={regData.section} style={{opacity: 0.7}} />
+                  <select className="form-input" value={regData.section} onChange={e => handleInputChange('section', e.target.value)}>
+                    <option>AIML</option>
+                  </select>
                 </div>
               </div>
-              
-              <div style={{ margin: '16px 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}></div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div className="form-group mb-3">
                   <label className="form-label">College Email</label>
-                  <input type="email" className="form-input" required value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})} />
+                  <input type="email" className={`form-input ${errors.email ? 'error-input' : ''}`} placeholder="student@college.edu" value={regData.email} onChange={e => handleInputChange('email', e.target.value.trim())} onBlur={() => validateRegister('email')} />
+                  {errors.email && <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>{errors.email}</div>}
                 </div>
                 <div className="form-group mb-3">
                   <label className="form-label">Mobile</label>
-                  <input type="tel" className="form-input" required value={regData.phone} onChange={e => setRegData({...regData, phone: e.target.value})} />
+                  <input type="tel" className={`form-input ${errors.phone ? 'error-input' : ''}`} placeholder="10 digits" value={regData.phone} onChange={e => handleInputChange('phone', e.target.value.trim())} onBlur={() => validateRegister('phone')} />
+                  {errors.phone && <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>{errors.phone}</div>}
                 </div>
               </div>
 
               <div className="form-group mb-3">
                 <label className="form-label">Create Password</label>
-                <input type="password" minLength="6" className="form-input" required value={regData.password} onChange={e => setRegData({...regData, password: e.target.value})} />
+                <input type="password" minLength="6" className={`form-input ${errors.password ? 'error-input' : ''}`} value={regData.password} onChange={e => handleInputChange('password', e.target.value)} onBlur={() => validateRegister('password')} />
+                {errors.password && <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>{errors.password}</div>}
               </div>
 
               <div className="form-group mb-4">
                 <label className="form-label">Confirm Password</label>
-                <input type="password" minLength="6" className="form-input" required value={regData.confirm_password} onChange={e => setRegData({...regData, confirm_password: e.target.value})} />
+                <input type="password" minLength="6" className={`form-input ${errors.confirm_password ? 'error-input' : ''}`} value={regData.confirm_password} onChange={e => handleInputChange('confirm_password', e.target.value)} onBlur={() => validateRegister('confirm_password')} />
+                {errors.confirm_password && <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>{errors.confirm_password}</div>}
               </div>
 
               <button type="submit" className="btn btn-primary w-full" disabled={loading} style={{ height: 46 }}>
@@ -351,47 +393,9 @@ export default function LoginPage() {
             </form>
           )}
 
-          {/* Demo accounts */}
-          <div style={{ marginTop: 28 }}>
-            <div style={{
-              fontSize: 12, color: 'var(--gray-600)', textAlign: 'center',
-              marginBottom: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1
-            }}>
-              Demo Accounts
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-              {demoAccounts.map((acc) => (
-                <button
-                  key={acc.id}
-                  type="button"
-                  onClick={() => fillDemo(acc)}
-                  style={{
-                    background: 'var(--surface-dark-3)',
-                    border: `1px solid ${acc.color}33`,
-                    borderRadius: 8,
-                    padding: '8px 4px',
-                    cursor: 'pointer',
-                    color: acc.color,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    transition: 'var(--transition)',
-                    fontFamily: 'var(--font-primary)'
-                  }}
-                  onMouseOver={e => e.currentTarget.style.background = `${acc.color}15`}
-                  onMouseOut={e => e.currentTarget.style.background = 'var(--surface-dark-3)'}
-                >
-                  {acc.label}
-                </button>
-              ))}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--gray-700)', textAlign: 'center', marginTop: 8 }}>
-              Click to fill credentials automatically
-            </div>
-          </div>
-
           <div style={{ marginTop: 24, padding: '14px', background: 'rgba(99,102,241,0.08)', borderRadius: 10, border: '1px solid rgba(99,102,241,0.2)' }}>
             <div style={{ fontSize: 11, color: 'var(--gray-500)', lineHeight: 1.6 }}>
-              <strong style={{ color: 'var(--primary-400)' }}>Security Notice:</strong> This system works alongside your existing ERP. No unauthorized ERP access is performed. All actions are logged.
+              <strong style={{ color: 'var(--primary-400)' }}>Secure System:</strong> This application is completely independent. Authentic accounts are required.
             </div>
           </div>
         </div>

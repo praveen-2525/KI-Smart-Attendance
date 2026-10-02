@@ -19,175 +19,299 @@ import uuid, os
 # ============================================================
 # LEAVE ROUTER
 # ============================================================
-leave_router = APIRouter(prefix="/leave", tags=["Leave Requests"])
+leave_router = APIRouter(tags=["Leave Requests"])
 
+import secrets
+import re
 
-@leave_router.post("/submit")
-async def submit_leave(
-    from_date: str = Form(...),
-    to_date: str = Form(...),
-    reason: str = Form(...),
-    description: str = Form(""),
-    document: Optional[UploadFile] = File(None),
-    current_user: models.User = Depends(require_roles(models.UserRole.STUDENT)),
-    db: Session = Depends(get_db)
+def _generate_leave_id():
+    date_str = datetime.now().strftime("%Y%m%d")
+    rand_str = secrets.token_hex(2).upper()
+    return f"LEV-{date_str}-{rand_str}"
+
+async def _process_leave_submission(
+    leave_type: str,
+    from_date: str,
+    to_date: str,
+    reason: str,
+    parent_name: str,
+    parent_contact: str,
+    emergency_contact: Optional[str] = None,
+    remarks: Optional[str] = None,
+    document: Optional[UploadFile] = None,
+    current_user: models.User = None,
+    mongo_db = None
 ):
-    student = current_user.student_profile
-    if not student:
-        raise HTTPException(status_code=404, detail="Student profile not found")
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
 
-    # Check cutoff
-    cutoff_str = _get_setting(db, "leave.cutoff_time", settings.LEAVE_CUTOFF_TIME)
-    cutoff = time.fromisoformat(cutoff_str)
-    now_time = datetime.now().time()
+    # Fetch student profile from MongoDB student_accounts
+    student_doc = await mongo_db["student_accounts"].find_one({"register_no": current_user.login_id})
+    if not student_doc:
+        student_doc = await mongo_db["student_accounts"].find_one({
+            "$or": [
+                {"roll_number": current_user.login_id},
+                {"email": current_user.login_id.lower()}
+            ]
+        })
+    if not student_doc:
+        raise HTTPException(status_code=404, detail="Student profile not found in database.")
 
-    from_dt = date.fromisoformat(from_date)
-    # Only check cutoff if it's a same-day leave
-    if from_dt == date.today() and now_time > cutoff:
-        next_opening = _get_setting(db, "leave.next_opening_time", settings.LEAVE_NEXT_OPENING_TIME)
+    # Profile validation
+    missing_fields = []
+    if not student_doc.get("name"): missing_fields.append("Student Name")
+    if not student_doc.get("register_no"): missing_fields.append("Register Number")
+    if not student_doc.get("department"): missing_fields.append("Department")
+    if not student_doc.get("year"): missing_fields.append("Year")
+    if not student_doc.get("section"): missing_fields.append("Section")
+    if not student_doc.get("email"): missing_fields.append("College Email")
+    if missing_fields:
         raise HTTPException(
             status_code=400,
-            detail=f"Today's leave request window is closed. Next opening time: {next_opening}"
+            detail=f"Incomplete profile information. Missing: {', '.join(missing_fields)}. Please contact administrator."
         )
+
+    # Field validations
+    try:
+        from_dt = date.fromisoformat(from_date)
+        to_dt = date.fromisoformat(to_date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+
+    if to_dt < from_dt:
+        raise HTTPException(status_code=400, detail="To Date cannot be earlier than From Date.")
+
+    number_of_days = (to_dt - from_dt).days + 1
+
+    if len(reason.strip()) < 10:
+        raise HTTPException(status_code=400, detail="Reason for leave must be at least 10 characters.")
+
+    if not parent_name or len(parent_name.strip()) < 2:
+        raise HTTPException(status_code=400, detail="Parent/Guardian Name is required.")
+
+    clean_parent_contact = parent_contact.strip().replace(" ", "").replace("-", "")
+    if not re.match(r"^[6-9][0-9]{9}$", clean_parent_contact):
+        raise HTTPException(status_code=400, detail="Parent contact number must be a valid 10-digit Indian mobile number starting with 6-9.")
+
+    if leave_type == "Medical Leave" and not document:
+        raise HTTPException(status_code=400, detail="Supporting document is required for Medical Leave.")
 
     doc_path = None
     if document:
-        doc_path = await _save_upload(document, f"leave/{student.id}")
+        allowed_exts = [".pdf", ".jpg", ".jpeg", ".png"]
+        ext = os.path.splitext(document.filename)[-1].lower()
+        if ext not in allowed_exts:
+            raise HTTPException(status_code=400, detail=f"Invalid document format '{ext}'. Allowed: PDF, JPG, JPEG, PNG.")
+        
+        # Check size limit (max 10MB)
+        content = await document.read()
+        if len(content) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File size exceeds maximum limit of 10MB.")
+        
+        # Save file
+        upload_dir = os.path.join(settings.UPLOAD_DIR, "leave")
+        os.makedirs(upload_dir, exist_ok=True)
+        filename = f"{uuid.uuid4()}{ext}"
+        file_dest = os.path.join(upload_dir, filename)
+        with open(file_dest, "wb") as f:
+            f.write(content)
+        doc_path = f"/uploads/leave/{filename}"
 
-    leave = models.LeaveRequest(
-        student_id=student.id,
-        from_date=from_dt,
-        to_date=date.fromisoformat(to_date),
-        reason=reason,
-        description=description,
-        document_path=doc_path,
-        status=models.LeaveStatus.SUBMITTED
-    )
-    db.add(leave)
-    db.flush()
+    # Check duplicate pending request
+    existing_pending = await mongo_db["leave_requests"].find_one({
+        "registerNumber": student_doc["register_no"],
+        "leaveType": leave_type,
+        "fromDate": from_date,
+        "toDate": to_date,
+        "status": "Pending"
+    })
+    if existing_pending:
+        raise HTTPException(status_code=400, detail="A pending leave request for the exact same dates and leave type already exists.")
 
-    audit = AuditService(db)
-    audit.log_leave_action(leave, "SUBMITTED", current_user.id, current_user.role)
+    request_id = _generate_leave_id()
+    now_iso = datetime.now(timezone.utc).isoformat()
 
-    notif = NotificationService(db)
-    notif.notify_leave_submitted(leave)
+    leave_record = {
+        "requestId": request_id,
+        "studentId": str(student_doc["_id"]),
+        "studentName": student_doc["name"],
+        "registerNumber": student_doc["register_no"],
+        "department": student_doc.get("department", "CSE(AI&ML)"),
+        "year": student_doc.get("year", "III Year"),
+        "section": student_doc.get("section", "AIML"),
+        "collegeEmail": student_doc.get("email"),
+        "leaveType": leave_type,
+        "fromDate": from_date,
+        "toDate": to_date,
+        "numberOfDays": number_of_days,
+        "reason": reason.strip(),
+        "parentName": parent_name.strip(),
+        "parentContact": clean_parent_contact,
+        "supportingDocument": doc_path,
+        "emergencyContact": emergency_contact.strip() if emergency_contact else "",
+        "remarks": remarks.strip() if remarks else "",
+        "status": "Pending",
+        "submittedAt": now_iso,
+        "updatedAt": now_iso,
+        "reviewedBy": None,
+        "reviewedAt": None,
+        "reviewerRemarks": None
+    }
 
-    db.commit()
-    return {"message": "Leave request submitted", "leave_id": leave.id}
+    result = await mongo_db["leave_requests"].insert_one(leave_record)
+    return {
+        "message": "Leave request submitted successfully.",
+        "requestId": request_id,
+        "id": str(result.inserted_id),
+        "status": "Pending"
+    }
 
-
-@leave_router.get("/my")
-async def get_my_leave_requests(
-    current_user: models.User = Depends(require_roles(models.UserRole.STUDENT)),
-    db: Session = Depends(get_db)
+@leave_router.post("/leave-requests")
+@leave_router.post("/leave/submit")
+async def create_leave_request(
+    leaveType: str = Form(...),
+    fromDate: str = Form(...),
+    toDate: str = Form(...),
+    reason: str = Form(...),
+    parentName: str = Form(...),
+    parentContact: str = Form(...),
+    emergencyContact: Optional[str] = Form(""),
+    remarks: Optional[str] = Form(""),
+    document: Optional[UploadFile] = File(None),
+    current_user: models.User = Depends(get_current_user),
+    mongo_db = Depends(get_db)
 ):
-    student = current_user.student_profile
-    requests = db.query(models.LeaveRequest).filter(
-        models.LeaveRequest.student_id == student.id
-    ).order_by(models.LeaveRequest.submitted_at.desc()).all()
-    return {"requests": [_format_leave(r) for r in requests]}
+    return await _process_leave_submission(
+        leave_type=leaveType,
+        from_date=fromDate,
+        to_date=toDate,
+        reason=reason,
+        parent_name=parentName,
+        parent_contact=parentContact,
+        emergency_contact=emergencyContact,
+        remarks=remarks,
+        document=document,
+        current_user=current_user,
+        mongo_db=mongo_db
+    )
 
+@leave_router.get("/leave-requests/my")
+@leave_router.get("/leave/my")
+async def get_my_leave_requests_mongo(
+    current_user: models.User = Depends(get_current_user),
+    mongo_db = Depends(get_db)
+):
+    requests = await mongo_db["leave_requests"].find({
+        "$or": [
+            {"registerNumber": current_user.login_id},
+            {"studentId": str(current_user.id)}
+        ]
+    }).sort("submittedAt", -1).to_list(length=200)
 
-@leave_router.get("/pending")
-async def get_pending_leave_requests(
+    for r in requests:
+        r["id"] = str(r["_id"])
+        del r["_id"]
+
+    return {"requests": requests}
+
+@leave_router.get("/leave-requests/pending")
+@leave_router.get("/leave/pending")
+async def get_pending_leave_requests_mongo(
     current_user: models.User = Depends(require_roles(
         models.UserRole.ADVISOR, models.UserRole.HOD, models.UserRole.DEO
     )),
-    db: Session = Depends(get_db)
+    mongo_db = Depends(get_db)
 ):
-    query = db.query(models.LeaveRequest).filter(
-        models.LeaveRequest.status.in_([models.LeaveStatus.SUBMITTED, models.LeaveStatus.UNDER_REVIEW])
+    requests = await mongo_db["leave_requests"].find({
+        "status": "Pending"
+    }).sort("submittedAt", -1).to_list(length=200)
+
+    for r in requests:
+        r["id"] = str(r["_id"])
+        del r["_id"]
+
+    return {"requests": requests}
+
+@leave_router.get("/leave-requests/{request_id}")
+@leave_router.get("/leave/{request_id}")
+async def get_leave_request_detail(
+    request_id: str,
+    current_user: models.User = Depends(get_current_user),
+    mongo_db = Depends(get_db)
+):
+    from bson import ObjectId
+    query = {"$or": [{"requestId": request_id}]}
+    if ObjectId.is_valid(request_id):
+        query["$or"].append({"_id": ObjectId(request_id)})
+
+    leave = await mongo_db["leave_requests"].find_one(query)
+    if not leave:
+        raise HTTPException(status_code=404, detail="Leave request not found")
+
+    leave["id"] = str(leave["_id"])
+    del leave["_id"]
+    return leave
+
+@leave_router.post("/leave-requests/{request_id}/cancel")
+async def cancel_leave_request(
+    request_id: str,
+    current_user: models.User = Depends(get_current_user),
+    mongo_db = Depends(get_db)
+):
+    from bson import ObjectId
+    query = {"$or": [{"requestId": request_id}]}
+    if ObjectId.is_valid(request_id):
+        query["$or"].append({"_id": ObjectId(request_id)})
+
+    leave = await mongo_db["leave_requests"].find_one(query)
+    if not leave:
+        raise HTTPException(status_code=404, detail="Leave request not found")
+
+    if leave.get("status") != "Pending":
+        raise HTTPException(status_code=400, detail="Only pending requests can be cancelled.")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await mongo_db["leave_requests"].update_one(
+        {"_id": leave["_id"]},
+        {"$set": {"status": "Cancelled", "updatedAt": now_iso}}
     )
-    if current_user.role == models.UserRole.ADVISOR:
-        faculty = current_user.faculty_profile
-        if faculty and faculty.advisor_section_id:
-            query = query.join(models.Student).filter(
-                models.Student.section_id == faculty.advisor_section_id
-            )
-    return {"requests": [_format_leave(r, include_student=True) for r in query.all()]}
+    return {"message": "Leave request cancelled successfully.", "status": "Cancelled"}
 
-
-@leave_router.post("/{leave_id}/approve")
-async def approve_leave(
-    leave_id: int,
-    notes: Optional[str] = None,
+@leave_router.post("/leave-requests/{request_id}/review")
+async def review_leave_request(
+    request_id: str,
+    status: str = Form(...), # "Approved" or "Rejected"
+    reviewerRemarks: Optional[str] = Form(""),
     current_user: models.User = Depends(require_roles(
         models.UserRole.ADVISOR, models.UserRole.HOD
     )),
-    db: Session = Depends(get_db)
+    mongo_db = Depends(get_db)
 ):
-    leave = db.query(models.LeaveRequest).filter(models.LeaveRequest.id == leave_id).first()
+    if status not in ["Approved", "Rejected"]:
+        raise HTTPException(status_code=400, detail="Status must be 'Approved' or 'Rejected'")
+
+    from bson import ObjectId
+    query = {"$or": [{"requestId": request_id}]}
+    if ObjectId.is_valid(request_id):
+        query["$or"].append({"_id": ObjectId(request_id)})
+
+    leave = await mongo_db["leave_requests"].find_one(query)
     if not leave:
         raise HTTPException(status_code=404, detail="Leave request not found")
 
-    now = datetime.now(timezone.utc)
-    if current_user.role == models.UserRole.ADVISOR:
-        leave.advisor_id = current_user.id
-        leave.advisor_action = "approved"
-        leave.advisor_notes = notes
-        leave.advisor_actioned_at = now
-    elif current_user.role == models.UserRole.HOD:
-        leave.hod_id = current_user.id
-        leave.hod_action = "approved"
-        leave.hod_notes = notes
-        leave.hod_actioned_at = now
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await mongo_db["leave_requests"].update_one(
+        {"_id": leave["_id"]},
+        {"$set": {
+            "status": status,
+            "reviewedBy": current_user.full_name or current_user.login_id,
+            "reviewedAt": now_iso,
+            "reviewerRemarks": reviewerRemarks,
+            "updatedAt": now_iso
+        }}
+    )
+    return {"message": f"Leave request {status.lower()} successfully.", "status": status}
 
-    leave.status = models.LeaveStatus.APPROVED
-
-    # Apply to attendance
-    conflicts = await apply_leave_to_attendance(db, leave, current_user)
-    leave.status = models.LeaveStatus.ATTENDANCE_MARKED
-    leave.attendance_marked_at = now
-
-    audit = AuditService(db)
-    audit.log_leave_action(leave, "APPROVED_AND_APPLIED", current_user.id, current_user.role, notes)
-
-    notif = NotificationService(db)
-    notif.notify_leave_approved(leave)
-
-    db.commit()
-    return {"message": "Leave approved and attendance marked", "conflicts": len(conflicts)}
-
-
-@leave_router.post("/{leave_id}/reject")
-async def reject_leave(
-    leave_id: int,
-    reason: str,
-    current_user: models.User = Depends(require_roles(
-        models.UserRole.ADVISOR, models.UserRole.HOD
-    )),
-    db: Session = Depends(get_db)
-):
-    leave = db.query(models.LeaveRequest).filter(models.LeaveRequest.id == leave_id).first()
-    if not leave:
-        raise HTTPException(status_code=404, detail="Leave request not found")
-
-    leave.status = models.LeaveStatus.REJECTED
-    if current_user.role == models.UserRole.ADVISOR:
-        leave.advisor_action = "rejected"
-        leave.advisor_notes = reason
-    else:
-        leave.hod_action = "rejected"
-        leave.hod_notes = reason
-
-    db.commit()
-    return {"message": "Leave request rejected"}
-
-
-def _format_leave(lr, include_student=False):
-    r = {
-        "id": lr.id, "from_date": lr.from_date, "to_date": lr.to_date,
-        "reason": lr.reason, "description": lr.description,
-        "status": lr.status, "submitted_at": lr.submitted_at,
-        "advisor_action": lr.advisor_action, "hod_action": lr.hod_action
-    }
-    if include_student and lr.student:
-        r["student"] = {
-            "id": lr.student.id,
-            "register_number": lr.student.register_number,
-            "name": lr.student.user.full_name
-        }
-    return r
 
 
 # ============================================================

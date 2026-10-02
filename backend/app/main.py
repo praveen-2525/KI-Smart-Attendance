@@ -14,6 +14,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from sqlalchemy.exc import SQLAlchemyError
 from app.config import settings
 
 # Import routers
@@ -38,14 +40,14 @@ async def lifespan(app: FastAPI):
     # Create upload directory
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     
-    print(f"✅ KI Smart Attendance+ started")
-    print(f"📊 Database: {settings.MONGODB_DB_NAME}")
-    print(f"📁 Uploads: {settings.UPLOAD_DIR}")
+    print(f"[INFO] KI Smart Attendance+ started")
+    print(f"[INFO] Database: {settings.MONGODB_DB_NAME}")
+    print(f"[INFO] Uploads: {settings.UPLOAD_DIR}")
     
     yield
     
     await close_mongo_connection()
-    print("🛑 KI Smart Attendance+ shutting down")
+    print("[INFO] KI Smart Attendance+ shutting down")
 
 
 
@@ -146,11 +148,12 @@ async def root():
 @app.get("/health", tags=["Health"])
 async def health_check():
     try:
-        from app.database import SessionLocal
-        db = SessionLocal()
-        db.execute("SELECT 1")
-        db.close()
-        db_status = "healthy"
+        from app.database import client
+        if client:
+            await client.admin.command('ping')
+            db_status = "healthy"
+        else:
+            db_status = "unhealthy"
     except Exception:
         db_status = "unhealthy"
     return {"status": "ok", "database": db_status}

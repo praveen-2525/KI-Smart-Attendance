@@ -80,25 +80,32 @@ export const attendanceApi = {
 
 // OD APIs
 export const odApi = {
-  submit: (formData) => api.post('/od/submit', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
-  getMy: (params) => api.get('/od/my', { params }),
-  getPending: (params) => api.get('/od/pending', { params }),
-  approve: (odId, notes) => api.post(`/od/${odId}/approve`, null, { params: { notes } }),
-  reject: (odId, reason) => api.post(`/od/${odId}/reject`, null, { params: { reason } }),
-  submitProof: (odId, formData) =>
-    api.post(`/od/${odId}/submit-proof`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
-  verifyProof: (odId, approved, notes) =>
-    api.post(`/od/${odId}/verify-proof`, null, { params: { approved, notes } }),
-  get: (odId) => api.get(`/od/${odId}`),
+  submit: (formData) => api.post('/od-requests', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  getMy: (params) => api.get('/od-requests/my', { params }),
+  getPending: (params) => api.get('/od-requests/pending', { params }),
+  get: (odId) => api.get(`/od-requests/${odId}`),
+  cancel: (odId) => api.post(`/od-requests/${odId}/cancel`),
+  review: (odId, status, reviewerRemarks) => {
+    const fd = new FormData();
+    fd.append('status', status);
+    if (reviewerRemarks) fd.append('reviewerRemarks', reviewerRemarks);
+    return api.post(`/od-requests/${odId}/review`, fd);
+  },
 };
 
 // Leave APIs
 export const leaveApi = {
-  submit: (formData) => api.post('/leave/submit', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
-  getMy: () => api.get('/leave/my'),
-  getPending: () => api.get('/leave/pending'),
-  approve: (leaveId, notes) => api.post(`/leave/${leaveId}/approve`, null, { params: { notes } }),
-  reject: (leaveId, reason) => api.post(`/leave/${leaveId}/reject`, null, { params: { reason } }),
+  submit: (formData) => api.post('/leave-requests', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  getMy: () => api.get('/leave-requests/my'),
+  getPending: () => api.get('/leave-requests/pending'),
+  get: (leaveId) => api.get(`/leave-requests/${leaveId}`),
+  cancel: (leaveId) => api.post(`/leave-requests/${leaveId}/cancel`),
+  review: (leaveId, status, reviewerRemarks) => {
+    const fd = new FormData();
+    fd.append('status', status);
+    if (reviewerRemarks) fd.append('reviewerRemarks', reviewerRemarks);
+    return api.post(`/leave-requests/${leaveId}/review`, fd);
+  },
 };
 
 // Late Arrival APIs

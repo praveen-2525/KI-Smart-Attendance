@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from app.database import get_db, get_mongo_db
+from app.database import get_db
 from app import models
 from app.auth import (
     verify_password, get_password_hash, create_access_token,
@@ -26,6 +26,7 @@ class LoginRequest(BaseModel):
     password: str
 
 class RegisterRequest(BaseModel):
+    roll_number: str
     register_no: str
     name: str
     date_of_birth: str
@@ -69,14 +70,14 @@ class FCMTokenUpdate(BaseModel):
 @router.post("/verify-student")
 async def verify_student(
     data: VerifyStudentRequest,
-    mongo_db = Depends(get_mongo_db)
+    mongo_db = Depends(get_db)
 ):
     reg_no = data.register_no.strip()
-    master = mongo_db["student_master"].find_one({"register_no": reg_no})
+    master = await mongo_db["student_master"].find_one({"register_no": reg_no})
     if not master:
         raise HTTPException(status_code=403, detail="Register Number not recognized. Please contact the college administrator.")
         
-    existing_account = mongo_db["student_accounts"].find_one({"register_no": reg_no})
+    existing_account = await mongo_db["student_accounts"].find_one({"register_no": reg_no})
     if existing_account:
         raise HTTPException(status_code=400, detail="This Register Number is already registered. Please sign in instead.")
         
@@ -93,39 +94,52 @@ async def verify_student(
 @router.post("/register")
 async def register(
     data: RegisterRequest,
-    mongo_db = Depends(get_mongo_db)
+    mongo_db = Depends(get_db)
 ):
+    try:
+        # Check DB connection
+        await mongo_db.command("ping")
+    except Exception:
+        raise HTTPException(status_code=503, detail="Authentication server is currently unavailable.")
+
+    import re
     if data.password != data.confirm_password:
         raise HTTPException(status_code=400, detail="Passwords do not match")
     
+    roll_no = data.roll_number.strip()
     reg_no = data.register_no.strip()
+    email = data.email.strip().lower()
     
-    # 1. Check if authorized student exists in student_master
-    master = mongo_db["student_master"].find_one({"register_no": reg_no})
-    if not master:
-        raise HTTPException(status_code=403, detail="Register Number not recognized. Please contact the college administrator.")
+    # Backend validations
+    if not re.match(r"^[0-9]{2}AIM[0-9]{3}$", roll_no):
+        raise HTTPException(status_code=400, detail="Roll Number must be in the format 24AIM040.")
+    if not re.match(r"^[0-9]{12}$", reg_no):
+        raise HTTPException(status_code=400, detail="Register Number must contain exactly 12 digits.")
+    if not re.match(r"^[0-9]{10}$", data.phone.strip()):
+        raise HTTPException(status_code=400, detail="Mobile Number must contain exactly 10 digits.")
     
     # 2. Check if already registered in student_accounts
-    existing_account = mongo_db["student_accounts"].find_one({"register_no": reg_no})
-    if existing_account:
-        raise HTTPException(status_code=400, detail="This Register Number is already registered. Please sign in instead.")
+    if await mongo_db["student_accounts"].find_one({"roll_number": roll_no}):
+        raise HTTPException(status_code=400, detail="This Roll Number is already registered.")
         
-    existing_email = mongo_db["student_accounts"].find_one({"email": data.email})
-    if existing_email:
-        raise HTTPException(status_code=400, detail="This email is already registered.")
+    if await mongo_db["student_accounts"].find_one({"register_no": reg_no}):
+        raise HTTPException(status_code=400, detail="This Register Number is already registered.")
+        
+    if await mongo_db["student_accounts"].find_one({"email": email}):
+        raise HTTPException(status_code=400, detail="This College Email is already registered.")
 
-    # 3. Create document in student_accounts using MASTER data for core fields
+    # 3. Create document in student_accounts using provided data
     new_student = {
-        "student_master_id": str(master["_id"]),
+        "roll_number": roll_no,
         "register_no": reg_no,
-        "name": master["name"],
-        "date_of_birth": master["date_of_birth"],
-        "department": master["department"],
-        "department_code": master.get("department_code"),
-        "year": master["year"],
-        "section": master["section"],
-        "email": data.email,
-        "phone": data.phone,
+        "name": data.name,
+        "date_of_birth": data.date_of_birth,
+        "department": data.department,
+        "department_code": "AIML" if data.department == "CSE(AI&ML)" else "",
+        "year": data.year,
+        "section": data.section,
+        "email": email,
+        "phone": data.phone.strip(),
         "password_hash": get_password_hash(data.password),
         "role": "STUDENT",
         "status": "ACTIVE",
@@ -134,13 +148,7 @@ async def register(
         "updated_at": datetime.now(timezone.utc)
     }
     
-    result = mongo_db["student_accounts"].insert_one(new_student)
-    
-    # Update master record status
-    mongo_db["student_master"].update_one(
-        {"register_no": reg_no},
-        {"$set": {"status": "REGISTERED"}}
-    )
+    result = await mongo_db["student_accounts"].insert_one(new_student)
     
     return {"message": "Registration successful", "id": str(result.inserted_id)}
 
@@ -150,78 +158,87 @@ async def login(
     request: Request,
     login_data: LoginRequest,
     db: Session = Depends(get_db),
-    mongo_db = Depends(get_mongo_db)
+    mongo_db = Depends(get_db)
 ):
-    login_id = login_data.login_id
+    try:
+        await mongo_db.command("ping")
+    except Exception:
+        raise HTTPException(status_code=503, detail="Authentication server is currently unavailable.")
+
+    login_id = login_data.login_id.strip()
+    
+    import re
+    # Determine type of login ID
+    login_type = None
+    query = None
+    
+    if re.match(r"^[0-9]{2}AIM[0-9]{3}$", login_id):
+        login_type = "Roll Number"
+        query = {"roll_number": login_id}
+    elif re.match(r"^[0-9]{12}$", login_id):
+        login_type = "Register Number"
+        query = {"register_no": login_id}
+    elif "@" in login_id:
+        login_type = "College Email"
+        query = {"email": login_id.lower()}
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Enter a valid Roll Number, 12-digit Register Number or College Email."
+        )
     
     # 1. Check student_accounts collection
-    mongo_user = mongo_db["student_accounts"].find_one({"register_no": login_id})
+    mongo_user = await mongo_db["student_accounts"].find_one(query)
+    
     if not mongo_user:
-        # Fallback to users collection for FACULTY, DEO, etc. demo accounts
-        mongo_user = mongo_db["users"].find_one({"login_id": login_id})
-        
-    user_found = mongo_user is not None
-    password_valid = False
-    role = None
-    status_msg = "UNKNOWN"
-    
-    if mongo_user:
-        # The prompt uses password_hash for students, hashed_password for older users
-        pw_hash = mongo_user.get("password_hash") or mongo_user.get("hashed_password", "")
-        password_valid = verify_password(login_data.password, pw_hash)
-        role = mongo_user.get("role")
-        status_msg = mongo_user.get("status", "INACTIVE")
-        
-    print(f"\nAuth Debug:\nlogin_id = {login_id}\nuser_found = {str(user_found).lower()}\nrole = {role}\nstatus = {status_msg}\npassword_valid = {str(password_valid).lower()}\n")
-    
-    if mongo_user and password_valid and status_msg == "ACTIVE":
-        user_doc_id = str(mongo_user["_id"])
-        import hashlib
-        num_id = int(hashlib.md5(user_doc_id.encode()).hexdigest(), 16) % (10 ** 8)
-        
-        # Create a mock SQL user object to reuse the rest of the flow seamlessly
-        user = models.User(
-            id=num_id,
-            login_id=login_id,
-            hashed_password=pw_hash,
-            role=role,
-            full_name=mongo_user.get("name", "User"),
-            is_active=True,
-            is_first_login=mongo_user.get("first_login", False)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No account found for this {login_type}."
         )
-    else:
-        # Fallback to SQL database for non-demo accounts (legacy support while migrating)
-        user = db.query(models.User).filter(models.User.login_id == login_id).first()
-        if not user or not verify_password(login_data.password, user.hashed_password):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid login ID or password"
-            )
-
-    if not getattr(user, 'is_active', True):
+        
+    user_found = True
+    password_valid = False
+    role = mongo_user.get("role")
+    status_msg = mongo_user.get("status", "INACTIVE")
+    
+    pw_hash = mongo_user.get("password_hash", "")
+    password_valid = verify_password(login_data.password, pw_hash)
+        
+    if not password_valid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect password."
+        )
+        
+    if status_msg != "ACTIVE":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is disabled. Contact administrator."
+            detail="Your account is inactive. Please contact the administrator."
         )
+        
+    user_doc_id = str(mongo_user["_id"])
+    import hashlib
+    num_id = int(hashlib.md5(user_doc_id.encode()).hexdigest(), 16) % (10 ** 8)
+    
+    # Create a mock SQL user object to reuse the rest of the flow seamlessly
+    user = models.User(
+        id=num_id,
+        login_id=login_id,
+        hashed_password=pw_hash,
+        role=role,
+        full_name=mongo_user.get("name", "User"),
+        is_active=True,
+        is_first_login=mongo_user.get("first_login", False)
+    )
 
-    # Update last login
-    user.last_login = datetime.now(timezone.utc)
-    # We only commit if it's an SQL user
-    if hasattr(user, '_sa_instance_state'):
-        db.commit()
+    # Update last login in MongoDB
+    await mongo_db["student_accounts"].update_one(
+        {"_id": mongo_user["_id"]},
+        {"$set": {"last_login": datetime.now(timezone.utc)}}
+    )
 
-    # Audit log (Assuming AuditService can handle it or we skip if MongoDB)
-    if hasattr(user, '_sa_instance_state'):
-        audit = AuditService(db)
-        audit.log(
-            action="USER_LOGIN",
-            entity_type="user",
-            entity_id=user.id,
-            user_id=user.id,
-            user_role=user.role,
-            ip_address=request.client.host if request.client else None
-        )
-        db.commit()
+    # TODO: Add Audit log for MongoDB
+
 
     access_token = create_access_token({"sub": str(user.id), "login_id": user.login_id, "role": user.role})
     refresh_token = create_refresh_token({"sub": str(user.id), "login_id": user.login_id, "role": user.role})
@@ -282,73 +299,72 @@ async def change_password(
 
     current_user.hashed_password = get_password_hash(data.new_password)
     current_user.is_first_login = False
-    db.commit()
-
-    audit = AuditService(db)
-    audit.log(
-        action="PASSWORD_CHANGED",
-        entity_type="user",
-        entity_id=current_user.id,
-        user_id=current_user.id,
-        user_role=current_user.role
-    )
-    db.commit()
+    
+    # Check if we should update mongo instead
+    if not hasattr(db, "commit"):
+        await db["student_accounts"].update_one(
+            {"register_no": current_user.login_id},
+            {"$set": {"password_hash": current_user.hashed_password, "first_login": False}}
+        )
+    else:
+        db.commit()
+        audit = AuditService(db)
+        audit.log(
+            action="PASSWORD_CHANGED",
+            entity_type="user",
+            entity_id=current_user.id,
+            user_id=current_user.id,
+            user_role=current_user.role
+        )
+        db.commit()
 
     return {"message": "Password changed successfully"}
 
 
 @router.get("/me")
-async def get_me(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db), mongo_db = Depends(get_mongo_db)):
+async def get_me(current_user: models.User = Depends(get_current_user), mongo_db = Depends(get_db)):
     profile_data = {}
-
-    is_sql_user = hasattr(current_user, '_sa_instance_state')
+    user_role_str = str(current_user.role).upper()
     
-    if current_user.role == models.UserRole.STUDENT:
-        student = current_user.student_profile if is_sql_user else None
-        if student:
+    if "STUDENT" in user_role_str:
+        # Fetch from MongoDB student_accounts
+        mongo_student = await mongo_db["student_accounts"].find_one({
+            "$or": [
+                {"register_no": current_user.login_id},
+                {"roll_number": current_user.login_id},
+                {"email": current_user.login_id.lower()}
+            ]
+        })
+        if mongo_student:
             profile_data = {
-                "register_number": student.register_number,
-                "year": student.year,
-                "semester": student.semester,
-                "academic_year": student.academic_year,
-                "department": student.department.name if student.department else None,
-                "department_code": student.department.code if student.department else None,
-                "class_name": student.class_.name if student.class_ else None,
-                "section": student.section.name if student.section else None,
-                "student_id": student.id
+                "name": mongo_student.get("name", current_user.full_name),
+                "full_name": mongo_student.get("name", current_user.full_name),
+                "register_number": mongo_student.get("register_no", current_user.login_id),
+                "roll_number": mongo_student.get("roll_number"),
+                "year": mongo_student.get("year", "III Year"),
+                "department": mongo_student.get("department", "CSE(AI&ML)"),
+                "department_code": mongo_student.get("department_code", "AIML"),
+                "section": mongo_student.get("section", "AIML"),
+                "email": mongo_student.get("email", current_user.email),
+                "phone": mongo_student.get("phone"),
+                "student_id": str(mongo_student["_id"])
             }
         else:
-            # Fetch from MongoDB student_accounts
-            mongo_student = mongo_db["student_accounts"].find_one({"register_no": current_user.login_id})
-            if mongo_student:
-                profile_data = {
-                    "register_number": mongo_student["register_no"],
-                    "year": mongo_student.get("year"),
-                    "department": mongo_student.get("department"),
-                    "department_code": mongo_student.get("department_code"),
-                    "section": mongo_student.get("section"),
-                }
-            else:
-                profile_data = {"register_number": current_user.login_id}
-            
-    elif current_user.role == models.UserRole.FACULTY:
-        faculty = current_user.faculty_profile if is_sql_user else None
-        if faculty:
             profile_data = {
-                "employee_id": faculty.employee_id,
-                "department": faculty.department.name if faculty.department else None,
-                "designation": faculty.designation,
-                "is_advisor": faculty.is_advisor,
-                "faculty_id": faculty.id
+                "name": current_user.full_name,
+                "full_name": current_user.full_name,
+                "register_number": current_user.login_id,
+                "email": current_user.email
             }
-        elif not is_sql_user:
-            profile_data = {"employee_id": current_user.login_id}
+            
+    elif "FACULTY" in user_role_str or "ADVISOR" in user_role_str or "HOD" in user_role_str:
+        profile_data = {"employee_id": current_user.login_id}
 
     return {
         "id": current_user.id,
         "login_id": current_user.login_id,
-        "full_name": current_user.full_name,
-        "email": current_user.email,
+        "full_name": profile_data.get("full_name") or current_user.full_name,
+        "email": profile_data.get("email") or current_user.email,
         "role": current_user.role,
         "is_active": current_user.is_active,
         "is_first_login": getattr(current_user, "is_first_login", False),
@@ -364,5 +380,8 @@ async def update_fcm_token(
     db: Session = Depends(get_db)
 ):
     current_user.fcm_token = data.fcm_token
-    db.commit()
+    if not hasattr(db, "commit"):
+        pass # update mongo token here if needed
+    else:
+        db.commit()
     return {"message": "FCM token updated"}
