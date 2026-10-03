@@ -11,16 +11,34 @@ from app.config import settings
 from app.database import get_db
 from app import models
 
+import bcrypt
+if not hasattr(bcrypt, "__about__"):
+    bcrypt.__about__ = type("about", (), {"__version__": getattr(bcrypt, "__version__", "4.0.0")})
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    if not plain_password or not hashed_password:
+        return False
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        try:
+            pw_bytes = plain_password.encode('utf-8')
+            hash_bytes = hashed_password.encode('utf-8')
+            return bcrypt.checkpw(pw_bytes, hash_bytes)
+        except Exception:
+            return False
 
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    try:
+        return pwd_context.hash(password)
+    except Exception:
+        salt = bcrypt.gensalt()
+        return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -104,7 +122,7 @@ async def get_current_user(
         id=num_id,
         login_id=login_id,
         role=user_role,
-        full_name=mongo_user.get("name", "User"),
+        full_name=mongo_user.get("name") or mongo_user.get("fullName", "User"),
         email=mongo_user.get("email", ""),
         is_active=mongo_user.get("status", "ACTIVE") == "ACTIVE"
     )

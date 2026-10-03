@@ -165,30 +165,40 @@ async def login(
     login_id = login_data.login_id.strip()
     target_role = login_data.target_role.lower() if login_data.target_role else None
     
-    import re
-    query = None
-    
-    if re.match(r"^[0-9]{2}AIM[0-9]{3}$", login_id):
-        query = {"roll_number": login_id}
-    elif re.match(r"^[0-9]{12}$", login_id):
-        query = {"register_no": login_id}
-    elif "@" in login_id:
-        query = {"email": login_id.lower()}
-    else:
-        query = {"$or": [{"email": login_id.lower()}, {"login_id": login_id}]}
+    clean_id = login_id
+    clean_email = login_id.lower()
+
+    # Generic lookup query supporting both snake_case and camelCase field conventions
+    student_query = {
+        "$or": [
+            {"email": clean_email},
+            {"collegeEmail": clean_email},
+            {"register_no": clean_id},
+            {"registerNumber": clean_id},
+            {"roll_number": clean_id},
+            {"rollNumber": clean_id},
+            {"login_id": clean_id}
+        ]
+    }
+
+    staff_query = {
+        "$or": [
+            {"email": clean_email},
+            {"collegeEmail": clean_email},
+            {"login_id": clean_id}
+        ]
+    }
     
     # 1. Check student_accounts collection
-    mongo_user = await mongo_db["student_accounts"].find_one(query)
+    mongo_user = await mongo_db["student_accounts"].find_one(student_query)
     
     # 2. If not found in student_accounts, check staff_accounts collection
     if not mongo_user:
-        mongo_user = await mongo_db["staff_accounts"].find_one(query)
+        mongo_user = await mongo_db["staff_accounts"].find_one(staff_query)
 
-    # Also search by string login_id if query didn't catch it
+    # 3. Fallback check in users collection if present
     if not mongo_user:
-        mongo_user = await mongo_db["student_accounts"].find_one({"login_id": login_id})
-    if not mongo_user:
-        mongo_user = await mongo_db["staff_accounts"].find_one({"login_id": login_id})
+        mongo_user = await mongo_db["users"].find_one({"$or": [{"email": clean_email}, {"login_id": clean_id}]})
     
     if not mongo_user:
         raise HTTPException(
@@ -197,34 +207,43 @@ async def login(
         )
         
     role = str(mongo_user.get("role", "")).lower()
-    status_msg = str(mongo_user.get("status", "INACTIVE")).upper()
+    raw_status = mongo_user.get("status") or mongo_user.get("accountStatus") or "ACTIVE"
+    status_msg = str(raw_status).upper()
 
     # Backend Role Verification against target portal if provided
     if target_role and target_role != role:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Your account does not have access to this portal."
+            detail="These credentials do not belong to the selected role."
         )
 
     # Check Account Status
     if status_msg == "INACTIVE":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Your account is currently inactive. Please contact the administrator."
+            detail="Your student account is inactive. Please contact the DEO."
         )
     elif status_msg == "SUSPENDED":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Your account has been suspended. Please contact the administrator."
+            detail="Your account has been suspended. Please contact the DEO."
         )
     elif status_msg != "ACTIVE":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Your account is not active. Please contact the administrator."
+            detail="Your student account is not active. Please contact the DEO."
         )
         
-    pw_hash = mongo_user.get("password_hash", "")
+    pw_hash = mongo_user.get("password_hash") or mongo_user.get("passwordHash") or ""
     password_valid = verify_password(login_data.password, pw_hash)
+
+    if not password_valid and mongo_user.get("date_of_birth"):
+        from app.routers.management import format_dob_password
+        import re
+        dob_pw = format_dob_password(str(mongo_user.get("date_of_birth")))
+        input_clean = re.sub(r"\D", "", login_data.password.strip())
+        if (input_clean == dob_pw or login_data.password.strip() == dob_pw) and verify_password(dob_pw, pw_hash):
+            password_valid = True
         
     if not password_valid:
         raise HTTPException(
@@ -241,7 +260,8 @@ async def login(
         login_id=login_id,
         hashed_password=pw_hash,
         role=role,
-        full_name=mongo_user.get("name", "User"),
+        full_name=mongo_user.get("name") or mongo_user.get("fullName", "User"),
+        email=mongo_user.get("email", ""),
         is_active=True,
         is_first_login=mongo_user.get("first_login", False)
     )

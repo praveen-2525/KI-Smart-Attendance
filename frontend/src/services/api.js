@@ -76,6 +76,7 @@ export const attendanceApi = {
   markBulk: (data) => api.post('/attendance/mark-bulk', data),
   getSectionAttendance: (sectionId, date, period) =>
     api.get(`/attendance/section/${sectionId}`, { params: { date, period } }),
+  getODLeaveStatus: (params) => api.get('/attendance/od-leave-status', { params }),
 };
 
 // OD APIs
@@ -83,6 +84,7 @@ export const odApi = {
   submit: (formData) => api.post('/od-requests', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   getMy: (params) => api.get('/od-requests/my', { params }),
   getPending: (params) => api.get('/od-requests/pending', { params }),
+  getApproved: (params) => api.get('/od-requests/approved', { params }),
   get: (odId) => api.get(`/od-requests/${odId}`),
   cancel: (odId) => api.post(`/od-requests/${odId}/cancel`),
   review: (odId, status, reviewerRemarks) => {
@@ -98,6 +100,7 @@ export const leaveApi = {
   submit: (formData) => api.post('/leave-requests', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   getMy: () => api.get('/leave-requests/my'),
   getPending: () => api.get('/leave-requests/pending'),
+  getApproved: (params) => api.get('/leave-requests/approved', { params }),
   get: (leaveId) => api.get(`/leave-requests/${leaveId}`),
   cancel: (leaveId) => api.post(`/leave-requests/${leaveId}/cancel`),
   review: (leaveId, status, reviewerRemarks) => {
@@ -168,6 +171,7 @@ export const usersApi = {
   createStudent: (data) => api.post('/users/student', data),
   createFaculty: (data) => api.post('/users/faculty', data),
   toggleStatus: (userId) => api.put(`/users/${userId}/toggle-status`),
+  deactivateStudent: (userId, reason) => api.post(`/users/students/${userId}/deactivate`, { reason }),
   importStudents: (formData) => api.post('/users/students/import', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),

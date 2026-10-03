@@ -1,7 +1,8 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { getRoleDashboardPath } from './utils/roleRedirect';
 
 // Layout components
 import Sidebar from './components/Sidebar';
@@ -21,6 +22,7 @@ import { ReportsPage, AuditPage, ERPPage, SettingsPage } from './pages/AdminPage
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import StudentImportPage from './pages/StudentImportPage';
 import { StudentsListPage, FacultyListPage, NotificationsPage, TimetablePage, ClassesPage, StaffDashboard } from './pages/StaffPages';
+import ApprovedODLeavePage, { StudentApprovedODLeave } from './pages/ApprovedODLeavePage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,6 +36,12 @@ const queryClient = new QueryClient({
 
 const PAGE_TITLES = {
   '/dashboard': 'Dashboard',
+  '/hod/dashboard': 'HOD Dashboard',
+  '/advisor/dashboard': 'Advisor Dashboard',
+  '/faculty/dashboard': 'Faculty Dashboard',
+  '/staff/dashboard': 'Staff Dashboard',
+  '/deo/dashboard': 'DEO Dashboard',
+  '/student/dashboard': 'Student Dashboard',
   '/profile': 'User Profile',
   '/attendance': 'My Attendance',
   '/planner': 'Smart Planner',
@@ -50,12 +58,14 @@ const PAGE_TITLES = {
   '/settings': 'Settings',
   '/audit': 'Audit Log',
   '/erp': 'ERP Integration',
+  '/approved-od-leave': 'Approved OD & Leave',
+  '/my-requests': 'My Requests',
 };
 
 function AppLayout() {
   const { user } = useAuth();
-  const path = window.location.pathname;
-  const title = PAGE_TITLES[path] || 'KI Smart Attendance+';
+  const location = useLocation();
+  const title = PAGE_TITLES[location.pathname] || 'KI Smart Attendance+';
 
   return (
     <div className="app-layout">
@@ -64,12 +74,47 @@ function AppLayout() {
         <TopBar title={title} />
         <div className="page-content" style={{ padding: 0 }}>
           <Routes>
-            <Route path="/dashboard" element={<DashboardByRole />} />
+            <Route path="/dashboard" element={<Navigate to={getRoleDashboardPath(user?.role)} replace />} />
+            <Route path="/hod/dashboard" element={
+              <ProtectedRoute allowedRoles={['hod']}>
+                <HODDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/advisor/dashboard" element={
+              <ProtectedRoute allowedRoles={['advisor']}>
+                <AdvisorDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/faculty/dashboard" element={
+              <ProtectedRoute allowedRoles={['faculty']}>
+                <FacultyDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/staff/dashboard" element={
+              <ProtectedRoute allowedRoles={['staff']}>
+                <StaffDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/deo/dashboard" element={
+              <ProtectedRoute allowedRoles={['deo']}>
+                <DEODashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/student/dashboard" element={
+              <ProtectedRoute allowedRoles={['student']}>
+                <StudentDashboard />
+              </ProtectedRoute>
+            } />
+            
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/attendance" element={<AttendancePage />} />
             <Route path="/planner" element={<PlannerPage />} />
-            <Route path="/od" element={<ODPage />} />
-            <Route path="/leave" element={<LeavePage />} />
+            <Route path="/od" element={
+              ['faculty', 'staff'].includes(user?.role) ? <Navigate to="/approved-od-leave" replace /> : <ODPage />
+            } />
+            <Route path="/leave" element={
+              ['faculty', 'staff'].includes(user?.role) ? <Navigate to="/approved-od-leave" replace /> : <LeavePage />
+            } />
             <Route path="/late" element={<LateArrivalPage />} />
             <Route path="/correction" element={<CorrectionPage />} />
             <Route path="/reports" element={<ReportsPage />} />
@@ -83,7 +128,15 @@ function AppLayout() {
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/timetable" element={<TimetablePage />} />
             <Route path="/classes" element={<ClassesPage />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/approved-od-leave" element={
+              user?.role === 'student'
+                ? <StudentApprovedODLeave />
+                : <ProtectedRoute allowedRoles={['advisor','hod','faculty','staff','deo']}><ApprovedODLeavePage /></ProtectedRoute>
+            } />
+            <Route path="/my-requests" element={
+              <ProtectedRoute allowedRoles={['student']}><ODPage /></ProtectedRoute>
+            } />
+            <Route path="*" element={<Navigate to={getRoleDashboardPath(user?.role)} replace />} />
           </Routes>
         </div>
       </div>
@@ -91,22 +144,9 @@ function AppLayout() {
   );
 }
 
-function DashboardByRole() {
-  const { user } = useAuth();
-  switch (user?.role) {
-    case 'student': return <StudentDashboard />;
-    case 'faculty': return <FacultyDashboard />;
-    case 'advisor': return <AdvisorDashboard />;
-    case 'hod': return <HODDashboard />;
-    case 'deo': return <DEODashboard />;
-    case 'staff': return <StaffDashboard />;
-    default: return <StudentDashboard />;
-  }
-}
-
-function ProtectedRoute({ children }) {
+function ProtectedRoute({ children, allowedRoles }) {
   const { user, loading } = useAuth();
-  const path = window.location.pathname;
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -128,10 +168,18 @@ function ProtectedRoute({ children }) {
 
   if (!user) return <Navigate to="/login" replace />;
   
-  if (user.is_first_login && path !== '/change-password') {
+  if (user.is_first_login && location.pathname !== '/change-password') {
     return <Navigate to="/change-password" replace />;
   }
   
+  if (allowedRoles && allowedRoles.length > 0) {
+    const userRole = (user?.role || '').toLowerCase();
+    const isAllowed = allowedRoles.some(r => r.toLowerCase() === userRole);
+    if (!isAllowed) {
+      return <Navigate to={getRoleDashboardPath(userRole)} replace />;
+    }
+  }
+
   return children;
 }
 
@@ -172,7 +220,7 @@ function App() {
 function LoginRedirect() {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) return <Navigate to={getRoleDashboardPath(user.role)} replace />;
   return <AuthFlowPage />;
 }
 

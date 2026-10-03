@@ -697,3 +697,84 @@ async def get_department_attendance_summary(
         "on_leave": le,
         "attendance_rate": round(pr / total * 100, 2) if total > 0 else 0
     }
+
+
+@router.get("/od-leave-status")
+async def get_od_leave_status_for_date(
+    check_date: Optional[str] = Query(None, alias="date"),
+    department: Optional[str] = None,
+    year: Optional[str] = None,
+    section: Optional[str] = None,
+    current_user: models.User = Depends(require_roles(
+        models.UserRole.FACULTY, models.UserRole.ADVISOR, models.UserRole.HOD,
+        models.UserRole.STAFF, models.UserRole.DEO
+    )),
+    mongo_db = Depends(get_db)
+):
+    """
+    Returns a mapping of registerNumber -> approved_type ('OD' or 'LEAVE') for all students
+    who have approved OD or Leave for the given date. Used by faculty during attendance marking
+    to automatically flag students as 'OD - Approved' or 'LEAVE - Approved'.
+    """
+    today_str = date.today().isoformat()
+    target_date = check_date if check_date else today_str
+
+    q_filter = {
+        "fromDate": {"$lte": target_date},
+        "toDate": {"$gte": target_date},
+        "status": "Approved"
+    }
+
+    if department:
+        q_filter["department"] = department
+    if year:
+        q_filter["year"] = year
+    if section:
+        q_filter["section"] = section
+
+    od_records = await mongo_db["od_requests"].find(q_filter, {
+        "registerNumber": 1, "studentName": 1, "rollNumber": 1,
+        "odType": 1, "fromDate": 1, "toDate": 1
+    }).to_list(length=1000)
+
+    leave_records = await mongo_db["leave_requests"].find(q_filter, {
+        "registerNumber": 1, "studentName": 1, "rollNumber": 1,
+        "leaveType": 1, "fromDate": 1, "toDate": 1
+    }).to_list(length=1000)
+
+    status_map = {}
+
+    for od in od_records:
+        reg_no = od.get("registerNumber", "")
+        if reg_no:
+            status_map[reg_no] = {
+                "type": "OD",
+                "label": "OD - Approved",
+                "studentName": od.get("studentName", ""),
+                "rollNumber": od.get("rollNumber", ""),
+                "detail": od.get("odType", "OD"),
+                "fromDate": od.get("fromDate"),
+                "toDate": od.get("toDate")
+            }
+
+    for lv in leave_records:
+        reg_no = lv.get("registerNumber", "")
+        if reg_no and reg_no not in status_map:
+            status_map[reg_no] = {
+                "type": "LEAVE",
+                "label": "LEAVE - Approved",
+                "studentName": lv.get("studentName", ""),
+                "rollNumber": lv.get("rollNumber", ""),
+                "detail": lv.get("leaveType", "Leave"),
+                "fromDate": lv.get("fromDate"),
+                "toDate": lv.get("toDate")
+            }
+
+    return {
+        "date": target_date,
+        "od_leave_students": status_map,
+        "od_count": len(od_records),
+        "leave_count": len(leave_records),
+        "total_affected": len(status_map)
+    }
+

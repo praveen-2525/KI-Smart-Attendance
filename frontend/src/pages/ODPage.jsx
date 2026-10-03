@@ -10,7 +10,7 @@ export default function ODPage() {
   const isReviewer = ['advisor', 'hod', 'deo'].includes(user?.role);
   const qc = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState('form'); // 'form' | 'my-requests'
+  const [activeTab, setActiveTab] = useState(isStudent ? 'form' : 'my-requests'); // 'form' | 'my-requests'
   const [selectedRequest, setSelectedRequest] = useState(null);
 
   // Form state
@@ -259,15 +259,17 @@ export default function ODPage() {
 
         {/* Tab switcher */}
         <div style={{ display: 'flex', background: 'var(--surface-dark-2)', borderRadius: 12, padding: 4, border: '1px solid var(--border-dark)' }}>
+          {isStudent && (
+            <button
+              className={`btn btn-sm ${activeTab === 'form' ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setActiveTab('form')}
+              style={{ borderRadius: 8, padding: '6px 16px', fontSize: 13 }}
+            >
+              ✏️ New OD Request
+            </button>
+          )}
           <button
-            className={`btn btn-sm ${activeTab === 'form' ? 'btn-primary' : 'btn-ghost'}`}
-            onClick={() => setActiveTab('form')}
-            style={{ borderRadius: 8, padding: '6px 16px', fontSize: 13 }}
-          >
-            ✏️ New OD Request
-          </button>
-          <button
-            className={`btn btn-sm ${activeTab === 'my-requests' ? 'btn-primary' : 'btn-ghost'}`}
+            className={`btn btn-sm ${activeTab === 'my-requests' || !isStudent ? 'btn-primary' : 'btn-ghost'}`}
             onClick={() => setActiveTab('my-requests')}
             style={{ borderRadius: 8, padding: '6px 16px', fontSize: 13 }}
           >
@@ -277,14 +279,14 @@ export default function ODPage() {
       </div>
 
       {/* Profile missing alert */}
-      {missingProfileFields.length > 0 && (
+      {isStudent && missingProfileFields.length > 0 && (
         <div className="card mb-6" style={{ background: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)', color: '#fca5a5' }}>
           ⚠️ <strong>Incomplete Profile Information:</strong> The following profile details are missing: {missingProfileFields.join(', ')}. Please update your profile in settings or contact admin before applying.
         </div>
       )}
 
-      {/* FORM TAB */}
-      {activeTab === 'form' && (
+      {/* FORM TAB - STUDENT ONLY */}
+      {activeTab === 'form' && isStudent && (
         <div className="card mb-6" style={{ maxWidth: 950, margin: '0 auto' }}>
           {/* Read-Only Student Profile Card */}
           <div style={{
@@ -709,10 +711,38 @@ export default function ODPage() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface-dark-3)', padding: '10px 14px', borderRadius: 8 }}>
-                <span>Status:</span>
-                {getStatusBadge(selectedRequest.status)}
+              <div style={{ background: 'var(--surface-dark-3)', padding: '12px 16px', borderRadius: 10, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, fontSize: 13 }}>
+                <div>
+                  <span style={{ fontSize: 11, color: 'var(--gray-500)', display: 'block' }}>Advisor Status</span>
+                  <strong style={{ color: selectedRequest.advisorStatus === 'APPROVED' ? 'var(--success)' : selectedRequest.advisorStatus === 'BYPASSED' ? 'var(--info)' : 'var(--warning)' }}>
+                    {selectedRequest.advisorStatus || 'PENDING'}
+                  </strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: 11, color: 'var(--gray-500)', display: 'block' }}>HOD Status</span>
+                  <strong style={{ color: selectedRequest.hodStatus === 'APPROVED' ? 'var(--success)' : selectedRequest.hodStatus === 'REJECTED' ? 'var(--danger)' : 'var(--warning)' }}>
+                    {selectedRequest.hodStatus || 'ACTION_REQUIRED'}
+                  </strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: 11, color: 'var(--gray-500)', display: 'block' }}>Final Status</span>
+                  {getStatusBadge(selectedRequest.status)}
+                </div>
               </div>
+
+              {selectedRequest.approvalType && (
+                <div style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', padding: '10px 14px', borderRadius: 8, fontSize: 13 }}>
+                  <span style={{ color: 'var(--primary-300)', fontWeight: 700 }}>Approval Method: </span>
+                  <span style={{ color: '#f8fafc' }}>
+                    {selectedRequest.approvalType === 'HOD_DIRECT_APPROVAL' ? '⚡ Direct HOD Approval (Advisor Bypassed)' : selectedRequest.approvalType === 'NORMAL_HOD_APPROVAL' ? '✅ Approved by HOD (Post Advisor Review)' : selectedRequest.approvalType}
+                  </span>
+                  {selectedRequest.approvedBy && (
+                    <div style={{ color: 'var(--gray-400)', fontSize: 12, marginTop: 2 }}>
+                      Approved By: <strong>{selectedRequest.approvedBy}</strong> ({selectedRequest.approvedByRole || 'HOD'})
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="grid-2" style={{ fontSize: 13, gap: 12 }}>
                 <div>
@@ -773,6 +803,25 @@ export default function ODPage() {
                   >
                     View Document ↗
                   </a>
+                </div>
+              )}
+
+              {/* Approval History Timeline */}
+              {selectedRequest.approvalHistory && selectedRequest.approvalHistory.length > 0 && (
+                <div style={{ background: 'var(--surface-dark-3)', padding: 12, borderRadius: 8, fontSize: 12 }}>
+                  <span style={{ color: 'var(--gray-400)', fontWeight: 700, display: 'block', marginBottom: 8 }}>📜 Audit & Approval History</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {selectedRequest.approvalHistory.map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--gray-300)', background: 'var(--surface-dark-4)', padding: '6px 10px', borderRadius: 6 }}>
+                        <span>
+                          <strong>{item.action}</strong> by {item.role} {item.approvalType ? `(${item.approvalType})` : ''}
+                        </span>
+                        <span style={{ color: 'var(--gray-500)' }}>
+                          {item.timestamp ? new Date(item.timestamp).toLocaleString('en-IN') : ''}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { notifApi } from '../services/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -13,6 +14,7 @@ const PRIORITY_COLORS = {
 
 export default function TopBar({ title }) {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const qc = useQueryClient();
@@ -101,19 +103,20 @@ export default function TopBar({ title }) {
                   <div style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>{user?.full_name}</div>
                   <div style={{ fontSize: 11, color: 'var(--gray-500)', textTransform: 'capitalize' }}>{user?.role}</div>
                 </div>
-                <a
-                  href="/profile"
-                  onClick={(e) => { e.preventDefault(); setProfileOpen(false); window.location.href = '/profile'; }}
+                <button
+                  type="button"
+                  onClick={() => { setProfileOpen(false); navigate('/profile'); }}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
+                    display: 'flex', alignItems: 'center', gap: 8, width: '100%',
                     padding: '8px 12px', borderRadius: 8, color: '#e2e8f0',
-                    fontSize: 13, textDecoration: 'none'
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 13, textAlign: 'left'
                   }}
                   onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
                   onMouseOut={e => e.currentTarget.style.background = 'none'}
                 >
                   👤 View Profile
-                </a>
+                </button>
                 <button
                   onClick={() => { setProfileOpen(false); logout(); }}
                   style={{

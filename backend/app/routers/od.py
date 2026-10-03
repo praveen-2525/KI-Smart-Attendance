@@ -151,6 +151,7 @@ async def _process_od_submission(
         "studentId": str(student_doc["_id"]),
         "studentName": student_doc["name"],
         "registerNumber": student_doc["register_no"],
+        "rollNumber": student_doc.get("roll_number", ""),
         "department": student_doc.get("department", "CSE(AI&ML)"),
         "year": student_doc.get("year", "III Year"),
         "section": student_doc.get("section", "AIML"),
@@ -173,18 +174,66 @@ async def _process_od_submission(
         "parentPermission": parent_permission,
         "remarks": remarks.strip() if remarks else "",
         "status": "Pending",
+        "advisorStatus": "PENDING",
+        "hodStatus": "ACTION_REQUIRED",
+        "approvalType": None,
+        "approvedBy": None,
+        "approvedByRole": None,
         "submittedAt": now_iso,
         "updatedAt": now_iso,
         "reviewedBy": None,
         "reviewedAt": None,
-        "reviewerRemarks": None
+        "reviewerRemarks": None,
+        "approvalHistory": [
+            {
+                "action": "SUBMITTED",
+                "userId": str(student_doc["_id"]),
+                "role": "STUDENT",
+                "timestamp": now_iso
+            }
+        ]
     }
 
     result = await mongo_db["od_requests"].insert_one(od_record)
+    doc_id = str(result.inserted_id)
+
+    # 1. Notify HOD of student's department
+    dept = student_doc.get("department", "")
+    hod_accounts = await mongo_db["staff_accounts"].find({"role": "hod"}).to_list(length=10)
+    for hod in hod_accounts:
+        if not dept or hod.get("department", "").upper() == dept.upper() or "AI" in hod.get("department", "").upper():
+            await mongo_db["notifications"].insert_one({
+                "user_id": str(hod["_id"]),
+                "email": hod.get("email"),
+                "category": "OD_REQUEST",
+                "title": f"New OD Request: {student_doc['name']}",
+                "message": f"{student_doc['name']} ({student_doc['register_no']}) submitted an OD request for {event_name.strip()} ({from_date} to {to_date}). Advisor: Pending | HOD: Action Required.",
+                "reference_type": "od_request",
+                "reference_id": request_id,
+                "is_read": False,
+                "created_at": now_iso
+            })
+
+    # 2. Notify Advisors
+    advisors = await mongo_db["staff_accounts"].find({"role": "advisor"}).to_list(length=10)
+    for adv in advisors:
+        if not dept or adv.get("department", "").upper() == dept.upper() or "AI" in adv.get("department", "").upper():
+            await mongo_db["notifications"].insert_one({
+                "user_id": str(adv["_id"]),
+                "email": adv.get("email"),
+                "category": "OD_REQUEST",
+                "title": f"New OD Request: {student_doc['name']}",
+                "message": f"{student_doc['name']} ({student_doc['register_no']}) submitted an OD request for {event_name.strip()}.",
+                "reference_type": "od_request",
+                "reference_id": request_id,
+                "is_read": False,
+                "created_at": now_iso
+            })
+
     return {
         "message": "OD request submitted successfully.",
         "requestId": request_id,
-        "id": str(result.inserted_id),
+        "id": doc_id,
         "status": "Pending"
     }
 
@@ -208,7 +257,7 @@ async def create_od_request(
     parentPermission: bool = Form(False),
     remarks: Optional[str] = Form(""),
     document: UploadFile = File(...),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_roles(models.UserRole.STUDENT)),
     mongo_db = Depends(get_db)
 ):
     return await _process_od_submission(
@@ -242,7 +291,8 @@ async def get_my_od_requests_mongo(
     requests = await mongo_db["od_requests"].find({
         "$or": [
             {"registerNumber": current_user.login_id},
-            {"studentId": str(current_user.id)}
+            {"studentId": str(current_user.id)},
+            {"collegeEmail": current_user.email.lower() if current_user.email else ""}
         ]
     }).sort("submittedAt", -1).to_list(length=200)
 
@@ -256,14 +306,65 @@ async def get_my_od_requests_mongo(
 @router.get("/od-requests/pending")
 @router.get("/od/pending")
 async def get_pending_od_requests_mongo(
+    status_filter: Optional[str] = Query(None, alias="status"),
+    department: Optional[str] = None,
+    year: Optional[str] = None,
+    section: Optional[str] = None,
+    search: Optional[str] = None,
+    approval_type: Optional[str] = None,
     current_user: models.User = Depends(require_roles(
         models.UserRole.ADVISOR, models.UserRole.HOD, models.UserRole.DEO
     )),
     mongo_db = Depends(get_db)
 ):
-    requests = await mongo_db["od_requests"].find({
-        "status": "Pending"
-    }).sort("submittedAt", -1).to_list(length=200)
+    user_role = str(current_user.role).lower()
+    query_filter = {}
+
+    # Department Scope Enforcement for HOD & Advisor
+    if user_role in ["hod", "advisor"]:
+        staff_doc = await mongo_db["staff_accounts"].find_one({
+            "$or": [{"email": current_user.email.lower() if current_user.email else ""}, {"login_id": current_user.login_id}]
+        })
+        user_dept = staff_doc.get("department") if staff_doc else None
+        if user_dept:
+            query_filter["$or"] = [
+                {"department": user_dept},
+                {"department": {"$regex": user_dept, "$options": "i"}}
+            ]
+            if "AI" in user_dept.upper() or "AIML" in user_dept.upper():
+                query_filter["$or"].extend([
+                    {"department": "CSE(AI&ML)"},
+                    {"department": "AIML"}
+                ])
+
+    if department:
+        query_filter["department"] = department
+    if year:
+        query_filter["year"] = year
+    if section:
+        query_filter["section"] = section
+    if approval_type:
+        query_filter["approvalType"] = approval_type
+
+    if status_filter:
+        if status_filter.lower() != "all":
+            query_filter["status"] = status_filter
+    else:
+        # Default pending list shows requests that are overall "Pending"
+        query_filter["status"] = "Pending"
+
+    if search:
+        search_or = [
+            {"studentName": {"$regex": search, "$options": "i"}},
+            {"registerNumber": {"$regex": search, "$options": "i"}},
+            {"eventName": {"$regex": search, "$options": "i"}}
+        ]
+        if "$or" in query_filter:
+            query_filter["$and"] = [{"$or": query_filter.pop("$or")}, {"$or": search_or}]
+        else:
+            query_filter["$or"] = search_or
+
+    requests = await mongo_db["od_requests"].find(query_filter).sort("submittedAt", -1).to_list(length=200)
 
     for r in requests:
         r["id"] = str(r["_id"])
@@ -288,6 +389,15 @@ async def get_od_request_detail(
     if not od:
         raise HTTPException(status_code=404, detail="OD request not found")
 
+    # Enforce Student Data Security
+    if str(current_user.role).lower() == "student":
+        if (
+            od.get("registerNumber") != current_user.login_id
+            and od.get("studentId") != str(current_user.id)
+            and od.get("collegeEmail", "").lower() != (current_user.email or "").lower()
+        ):
+            raise HTTPException(status_code=403, detail="Access denied. You can only view your own OD requests.")
+
     od["id"] = str(od["_id"])
     del od["_id"]
     return od
@@ -308,13 +418,30 @@ async def cancel_od_request(
     if not od:
         raise HTTPException(status_code=404, detail="OD request not found")
 
+    if str(current_user.role).lower() == "student":
+        if (
+            od.get("registerNumber") != current_user.login_id
+            and od.get("studentId") != str(current_user.id)
+        ):
+            raise HTTPException(status_code=403, detail="Access denied. You can only cancel your own OD requests.")
+
     if od.get("status") != "Pending":
         raise HTTPException(status_code=400, detail="Only pending requests can be cancelled.")
 
     now_iso = datetime.now(timezone.utc).isoformat()
     await mongo_db["od_requests"].update_one(
         {"_id": od["_id"]},
-        {"$set": {"status": "Cancelled", "updatedAt": now_iso}}
+        {
+            "$set": {"status": "Cancelled", "updatedAt": now_iso},
+            "$push": {
+                "approvalHistory": {
+                    "action": "CANCELLED",
+                    "userId": str(current_user.id),
+                    "role": str(current_user.role).upper(),
+                    "timestamp": now_iso
+                }
+            }
+        }
     )
     return {"message": "OD request cancelled successfully.", "status": "Cancelled"}
 
@@ -325,7 +452,7 @@ async def review_od_request(
     status: str = Form(...), # "Approved" or "Rejected"
     reviewerRemarks: Optional[str] = Form(""),
     current_user: models.User = Depends(require_roles(
-        models.UserRole.ADVISOR, models.UserRole.HOD
+        models.UserRole.ADVISOR, models.UserRole.HOD, models.UserRole.DEO
     )),
     mongo_db = Depends(get_db)
 ):
@@ -341,15 +468,348 @@ async def review_od_request(
     if not od:
         raise HTTPException(status_code=404, detail="OD request not found")
 
+    user_role = str(current_user.role).lower()
     now_iso = datetime.now(timezone.utc).isoformat()
-    await mongo_db["od_requests"].update_one(
-        {"_id": od["_id"]},
-        {"$set": {
-            "status": status,
-            "reviewedBy": current_user.full_name or current_user.login_id,
-            "reviewedAt": now_iso,
-            "reviewerRemarks": reviewerRemarks,
-            "updatedAt": now_iso
-        }}
-    )
-    return {"message": f"OD request {status.lower()} successfully.", "status": status}
+
+    # Prevent duplicate approval actions if request is already processed by HOD
+    if od.get("status") in ["Approved", "Rejected"] or od.get("hodStatus") in ["APPROVED", "REJECTED"]:
+        raise HTTPException(status_code=400, detail="This request has already been processed by HOD.")
+
+    # 1. HOD ACTION (Direct or Final Approval/Rejection)
+    if user_role == "hod":
+        # Department Security Check
+        staff_doc = await mongo_db["staff_accounts"].find_one({
+            "$or": [{"email": current_user.email.lower() if current_user.email else ""}, {"login_id": current_user.login_id}]
+        })
+        hod_dept = staff_doc.get("department", "") if staff_doc else ""
+        req_dept = od.get("department", "")
+
+        # Strict Department check
+        if hod_dept and req_dept and hod_dept.upper() not in req_dept.upper() and req_dept.upper() not in hod_dept.upper():
+            if not ("AI" in hod_dept.upper() and "AI" in req_dept.upper()):
+                raise HTTPException(status_code=403, detail=f"Security Violation: HOD from {hod_dept} cannot process requests for department {req_dept}.")
+
+        advisor_status_curr = od.get("advisorStatus", "PENDING")
+        if status == "Approved":
+            approval_type = "HOD_DIRECT_APPROVAL" if advisor_status_curr == "PENDING" else "NORMAL_HOD_APPROVAL"
+            adv_status_new = "BYPASSED" if advisor_status_curr == "PENDING" else advisor_status_curr
+
+            await mongo_db["od_requests"].update_one(
+                {"_id": od["_id"]},
+                {
+                    "$set": {
+                        "status": "Approved",
+                        "hodStatus": "APPROVED",
+                        "advisorStatus": adv_status_new,
+                        "approvalType": approval_type,
+                        "approvedBy": current_user.full_name or current_user.login_id,
+                        "approvedByRole": "HOD",
+                        "reviewedBy": current_user.full_name or current_user.login_id,
+                        "reviewedAt": now_iso,
+                        "reviewerRemarks": reviewerRemarks or "",
+                        "updatedAt": now_iso
+                    },
+                    "$push": {
+                        "approvalHistory": {
+                            "action": "APPROVED",
+                            "userId": str(current_user.id),
+                            "role": "HOD",
+                            "approvalType": approval_type,
+                            "timestamp": now_iso,
+                            "remarks": reviewerRemarks or ""
+                        }
+                    }
+                }
+            )
+
+            # Notify Student
+            notif_msg = f"Your OD request for '{od.get('eventName')}' was approved directly by HOD." if approval_type == "HOD_DIRECT_APPROVAL" else f"Your OD request for '{od.get('eventName')}' was approved by HOD."
+            await mongo_db["notifications"].insert_one({
+                "user_id": od.get("studentId"),
+                "email": od.get("collegeEmail"),
+                "category": "OD_APPROVAL",
+                "title": "OD Request Approved",
+                "message": notif_msg,
+                "reference_type": "od_request",
+                "reference_id": od.get("requestId"),
+                "is_read": False,
+                "created_at": now_iso
+            })
+
+            return {
+                "message": "OD request approved directly by HOD.",
+                "status": "Approved",
+                "approvalType": approval_type,
+                "approvedBy": current_user.full_name or current_user.login_id
+            }
+
+        else: # HOD Rejects
+            approval_type = "HOD_DIRECT_REJECTION"
+            await mongo_db["od_requests"].update_one(
+                {"_id": od["_id"]},
+                {
+                    "$set": {
+                        "status": "Rejected",
+                        "hodStatus": "REJECTED",
+                        "approvalType": approval_type,
+                        "approvedBy": current_user.full_name or current_user.login_id,
+                        "approvedByRole": "HOD",
+                        "reviewedBy": current_user.full_name or current_user.login_id,
+                        "reviewedAt": now_iso,
+                        "reviewerRemarks": reviewerRemarks or "",
+                        "updatedAt": now_iso
+                    },
+                    "$push": {
+                        "approvalHistory": {
+                            "action": "REJECTED",
+                            "userId": str(current_user.id),
+                            "role": "HOD",
+                            "approvalType": approval_type,
+                            "timestamp": now_iso,
+                            "remarks": reviewerRemarks or ""
+                        }
+                    }
+                }
+            )
+
+            # Notify Student
+            await mongo_db["notifications"].insert_one({
+                "user_id": od.get("studentId"),
+                "email": od.get("collegeEmail"),
+                "category": "OD_APPROVAL",
+                "title": "OD Request Rejected",
+                "message": f"Your OD request for '{od.get('eventName')}' was rejected by HOD. Remarks: {reviewerRemarks or 'None'}",
+                "reference_type": "od_request",
+                "reference_id": od.get("requestId"),
+                "is_read": False,
+                "created_at": now_iso
+            })
+
+            return {"message": "OD request rejected by HOD.", "status": "Rejected", "approvalType": approval_type}
+
+    # 2. ADVISOR ACTION
+    elif user_role == "advisor":
+        if status == "Approved":
+            await mongo_db["od_requests"].update_one(
+                {"_id": od["_id"]},
+                {
+                    "$set": {
+                        "advisorStatus": "APPROVED",
+                        "approvalType": "ADVISOR_APPROVAL",
+                        "approvedBy": current_user.full_name or current_user.login_id,
+                        "approvedByRole": "ADVISOR",
+                        "hodStatus": "ACTION_REQUIRED",
+                        "reviewedBy": current_user.full_name or current_user.login_id,
+                        "reviewedAt": now_iso,
+                        "reviewerRemarks": reviewerRemarks or "",
+                        "updatedAt": now_iso
+                    },
+                    "$push": {
+                        "approvalHistory": {
+                            "action": "APPROVED",
+                            "userId": str(current_user.id),
+                            "role": "ADVISOR",
+                            "approvalType": "ADVISOR_APPROVAL",
+                            "timestamp": now_iso,
+                            "remarks": reviewerRemarks or ""
+                        }
+                    }
+                }
+            )
+
+            # Notify HOD
+            dept = od.get("department", "")
+            hod_accounts = await mongo_db["staff_accounts"].find({"role": "hod"}).to_list(length=10)
+            for hod in hod_accounts:
+                if not dept or hod.get("department", "").upper() == dept.upper() or "AI" in hod.get("department", "").upper():
+                    await mongo_db["notifications"].insert_one({
+                        "user_id": str(hod["_id"]),
+                        "email": hod.get("email"),
+                        "category": "OD_REQUEST",
+                        "title": f"Advisor Approved OD: {od.get('studentName')}",
+                        "message": f"Advisor approved OD request for {od.get('studentName')} ({od.get('registerNumber')}). HOD approval required.",
+                        "reference_type": "od_request",
+                        "reference_id": od.get("requestId"),
+                        "is_read": False,
+                        "created_at": now_iso
+                    })
+
+            return {"message": "OD request approved by Advisor. Sent for HOD final review.", "status": "Pending", "advisorStatus": "APPROVED"}
+
+        else: # Advisor Rejects
+            await mongo_db["od_requests"].update_one(
+                {"_id": od["_id"]},
+                {
+                    "$set": {
+                        "status": "Rejected",
+                        "advisorStatus": "REJECTED",
+                        "approvalType": "ADVISOR_REJECTION",
+                        "approvedBy": current_user.full_name or current_user.login_id,
+                        "approvedByRole": "ADVISOR",
+                        "reviewedBy": current_user.full_name or current_user.login_id,
+                        "reviewedAt": now_iso,
+                        "reviewerRemarks": reviewerRemarks or "",
+                        "updatedAt": now_iso
+                    },
+                    "$push": {
+                        "approvalHistory": {
+                            "action": "REJECTED",
+                            "userId": str(current_user.id),
+                            "role": "ADVISOR",
+                            "approvalType": "ADVISOR_REJECTION",
+                            "timestamp": now_iso,
+                            "remarks": reviewerRemarks or ""
+                        }
+                    }
+                }
+            )
+
+            # Notify Student
+            await mongo_db["notifications"].insert_one({
+                "user_id": od.get("studentId"),
+                "email": od.get("collegeEmail"),
+                "category": "OD_APPROVAL",
+                "title": "OD Request Rejected",
+                "message": f"Your OD request for '{od.get('eventName')}' was rejected by Advisor.",
+                "reference_type": "od_request",
+                "reference_id": od.get("requestId"),
+                "is_read": False,
+                "created_at": now_iso
+            })
+
+            return {"message": "OD request rejected by Advisor.", "status": "Rejected"}
+
+    # DEO / Admin fallback
+    else:
+        await mongo_db["od_requests"].update_one(
+            {"_id": od["_id"]},
+            {
+                "$set": {
+                    "status": status,
+                    "approvedBy": current_user.full_name or current_user.login_id,
+                    "approvedByRole": str(current_user.role).upper(),
+                    "reviewedBy": current_user.full_name or current_user.login_id,
+                    "reviewedAt": now_iso,
+                    "reviewerRemarks": reviewerRemarks or "",
+                    "updatedAt": now_iso
+                }
+            }
+        )
+        return {"message": f"OD request {status.lower()} by DEO.", "status": status}
+
+
+@router.get("/od-requests/approved")
+async def get_approved_od_requests(
+    selected_date: Optional[str] = Query(None, alias="date"),
+    from_date: Optional[str] = Query(None, alias="fromDate"),
+    to_date: Optional[str] = Query(None, alias="toDate"),
+    department: Optional[str] = None,
+    year: Optional[str] = None,
+    section: Optional[str] = None,
+    search: Optional[str] = None,
+    od_type: Optional[str] = Query(None, alias="odType"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=200),
+    current_user: models.User = Depends(require_roles(
+        models.UserRole.ADVISOR, models.UserRole.HOD, models.UserRole.FACULTY,
+        models.UserRole.STAFF, models.UserRole.DEO
+    )),
+    mongo_db = Depends(get_db)
+):
+    """
+    Get approved OD records for a specific date (or date range).
+    Only shows requests where: status=Approved AND selectedDate is within [fromDate, toDate].
+    """
+    user_role = str(current_user.role).lower()
+
+    today_str = date.today().isoformat()
+    if selected_date:
+        check_date = selected_date
+    else:
+        check_date = today_str
+
+    query_filter = {"status": "Approved"}
+
+    # Date filtering: approved requests that overlap with selected date or range
+    if from_date and to_date:
+        if "$and" not in query_filter:
+            query_filter["$and"] = []
+        query_filter["$and"].extend([
+            {"fromDate": {"$lte": to_date}},
+            {"toDate": {"$gte": from_date}}
+        ])
+    else:
+        query_filter["fromDate"] = {"$lte": check_date}
+        query_filter["toDate"] = {"$gte": check_date}
+
+    # Department scope for HOD and Advisor
+    if user_role in ["hod", "advisor"]:
+        staff_doc = await mongo_db["staff_accounts"].find_one({
+            "$or": [
+                {"email": current_user.email.lower() if current_user.email else ""},
+                {"login_id": current_user.login_id}
+            ]
+        })
+        user_dept = staff_doc.get("department") if staff_doc else None
+        if user_dept:
+            dept_filter = [
+                {"department": user_dept},
+                {"department": {"$regex": user_dept, "$options": "i"}}
+            ]
+            if "AI" in user_dept.upper() or "AIML" in user_dept.upper():
+                dept_filter.extend([
+                    {"department": "CSE(AI&ML)"},
+                    {"department": "AIML"}
+                ])
+            if "$and" in query_filter:
+                query_filter["$and"].append({"$or": dept_filter})
+            else:
+                query_filter["$or"] = dept_filter
+
+    if department:
+        query_filter["department"] = department
+    if year:
+        query_filter["year"] = year
+    if section:
+        query_filter["section"] = section
+    if od_type:
+        query_filter["odType"] = od_type
+
+    if search:
+        search_or = [
+            {"studentName": {"$regex": search, "$options": "i"}},
+            {"registerNumber": {"$regex": search, "$options": "i"}},
+            {"rollNumber": {"$regex": search, "$options": "i"}},
+            {"eventName": {"$regex": search, "$options": "i"}}
+        ]
+        if "$or" in query_filter:
+            existing_or = query_filter.pop("$or")
+            if "$and" not in query_filter:
+                query_filter["$and"] = []
+            query_filter["$and"].extend([{"$or": existing_or}, {"$or": search_or}])
+        elif "$and" in query_filter:
+            query_filter["$and"].append({"$or": search_or})
+        else:
+            query_filter["$or"] = search_or
+
+    page_num = page
+    skip = (page_num - 1) * limit
+    total = await mongo_db["od_requests"].count_documents(query_filter)
+    records = await mongo_db["od_requests"].find(query_filter).sort(
+        [("fromDate", 1), ("studentName", 1)]
+    ).skip(skip).limit(limit).to_list(length=limit)
+
+    for r in records:
+        r["id"] = str(r["_id"])
+        del r["_id"]
+
+    return {
+        "records": records,
+        "total": total,
+        "page": page_num,
+        "limit": limit,
+        "selectedDate": check_date,
+        "totalPages": max(1, (total + limit - 1) // limit)
+    }
+
+

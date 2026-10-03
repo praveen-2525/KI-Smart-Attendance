@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { getRoleDashboardPath } from '../utils/roleRedirect';
 import toast from 'react-hot-toast';
 
 const ROLES = [
@@ -49,6 +51,7 @@ const ROLES = [
 
 export default function AuthFlowPage() {
   const { login } = useAuth();
+  const navigate = useNavigate();
   
   // Step 1: Landing, Step 2: Role Selection, Step 3: Login
   const [step, setStep] = useState(1);
@@ -103,6 +106,13 @@ export default function AuthFlowPage() {
       setLoginError("Password is required.");
       return false;
     }
+    // For non-student roles, only email is accepted
+    if (selectedRole && selectedRole.id !== 'student') {
+      if (!loginId.includes('@')) {
+        setLoginError("Please enter a valid institutional email address.");
+        return false;
+      }
+    }
     setLoginError('');
     return true;
   };
@@ -116,9 +126,18 @@ export default function AuthFlowPage() {
     try {
       const user = await login(loginId, password, selectedRole?.id || null);
       toast.success(`Welcome back, ${user.full_name || 'User'}!`);
+      const dashboardPath = getRoleDashboardPath(user.role);
+      navigate(dashboardPath, { replace: true });
     } catch (err) {
-      const detail = err.response?.data?.detail;
-      setLoginError(detail || "Invalid credentials. Please check your details and try again.");
+      let detail = err.response?.data?.detail;
+      if (!detail) {
+        if (err.message === 'Network Error' || !err.response) {
+          detail = "Unable to connect to the server. Please try again.";
+        } else {
+          detail = "Invalid email or password.";
+        }
+      }
+      setLoginError(detail);
     } finally {
       setLoading(false);
     }
@@ -426,50 +445,20 @@ export default function AuthFlowPage() {
               </div>
             </div>
 
-            {selectedRole.id === 'student' && (
-              <div style={{ display: 'flex', gap: 10, marginBottom: 24, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                <button
-                  type="button"
-                  onClick={() => { setActiveTab('login'); setLoginError(''); }}
-                  style={{
-                    background: 'none', border: 'none', padding: '8px 16px', cursor: 'pointer',
-                    color: activeTab === 'login' ? 'var(--primary-400)' : 'var(--gray-500)',
-                    borderBottom: activeTab === 'login' ? '2px solid var(--primary-400)' : '2px solid transparent',
-                    fontWeight: activeTab === 'login' ? 700 : 500, fontSize: 14
-                  }}
-                >
-                  LOGIN
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('register')}
-                  style={{
-                    background: 'none', border: 'none', padding: '8px 16px', cursor: 'pointer',
-                    color: activeTab === 'register' ? 'var(--primary-400)' : 'var(--gray-500)',
-                    borderBottom: activeTab === 'register' ? '2px solid var(--primary-400)' : '2px solid transparent',
-                    fontWeight: activeTab === 'register' ? 700 : 500, fontSize: 14
-                  }}
-                >
-                  REGISTER
-                </button>
+            <form onSubmit={handleLoginSubmit}>
+              <div className="form-group mb-4">
+                <label className="form-label">
+                  {selectedRole.id === 'student' ? 'College Email / Register Number' : 'Email ID'}
+                </label>
+                <input
+                  type={selectedRole.id === 'student' ? 'text' : 'email'}
+                  className="form-input"
+                  placeholder={selectedRole.id === 'student' ? 'e.g. student@kitech.edu.in or 7376241AI101' : `e.g. ${selectedRole.id}.aiml@kitech.edu.in`}
+                  value={loginId}
+                  onChange={(e) => { setLoginId(e.target.value); setLoginError(''); }}
+                  autoComplete="username"
+                />
               </div>
-            )}
-
-            {activeTab === 'login' || selectedRole.id !== 'student' ? (
-              <form onSubmit={handleLoginSubmit}>
-                <div className="form-group mb-4">
-                  <label className="form-label">
-                    {selectedRole.id === 'student' ? 'Register Number / Email / Roll Number' : 'College Email / Username'}
-                  </label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder={selectedRole.id === 'student' ? 'e.g. 7376222AL101' : 'e.g. fac002 or email@kit.edu'}
-                    value={loginId}
-                    onChange={(e) => { setLoginId(e.target.value); setLoginError(''); }}
-                    autoComplete="username"
-                  />
-                </div>
 
                 <div className="form-group mb-2">
                   <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -515,86 +504,6 @@ export default function AuthFlowPage() {
                   {loading ? <span className="spinner" /> : 'Sign In as ' + selectedRole.title}
                 </button>
               </form>
-            ) : (
-              <form onSubmit={handleRegisterSubmit}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div className="form-group mb-3">
-                    <label className="form-label">Roll Number</label>
-                    <input type="text" className={`form-input ${errors.roll_number ? 'error-input' : ''}`} placeholder="e.g. 24AIM040" value={regData.roll_number} onChange={e => handleInputChange('roll_number', e.target.value.trim())} onBlur={() => validateRegister('roll_number')} />
-                    {errors.roll_number && <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>{errors.roll_number}</div>}
-                  </div>
-                  <div className="form-group mb-3">
-                    <label className="form-label">Register No.</label>
-                    <input type="text" className={`form-input ${errors.register_no ? 'error-input' : ''}`} placeholder="12 digits" value={regData.register_no} onChange={e => handleInputChange('register_no', e.target.value.trim())} onBlur={() => validateRegister('register_no')} />
-                    {errors.register_no && <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>{errors.register_no}</div>}
-                  </div>
-                </div>
-
-                <div className="form-group mb-3">
-                  <label className="form-label">Full Name</label>
-                  <input type="text" className={`form-input ${errors.name ? 'error-input' : ''}`} placeholder="e.g. Praveen S" value={regData.name} onChange={e => handleInputChange('name', e.target.value)} onBlur={() => validateRegister('name')} />
-                  {errors.name && <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>{errors.name}</div>}
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div className="form-group mb-3">
-                    <label className="form-label">DOB</label>
-                    <input type="date" className={`form-input ${errors.date_of_birth ? 'error-input' : ''}`} value={regData.date_of_birth} onChange={e => handleInputChange('date_of_birth', e.target.value)} onBlur={() => validateRegister('date_of_birth')} />
-                    {errors.date_of_birth && <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>{errors.date_of_birth}</div>}
-                  </div>
-                  <div className="form-group mb-3">
-                    <label className="form-label">Department</label>
-                    <select className="form-input" value={regData.department} onChange={e => handleInputChange('department', e.target.value)}>
-                      <option>CSE(AI&ML)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div className="form-group mb-3">
-                    <label className="form-label">Year</label>
-                    <select className="form-input" value={regData.year} onChange={e => handleInputChange('year', e.target.value)}>
-                      <option>III</option>
-                    </select>
-                  </div>
-                  <div className="form-group mb-3">
-                    <label className="form-label">Section</label>
-                    <select className="form-input" value={regData.section} onChange={e => handleInputChange('section', e.target.value)}>
-                      <option>AIML</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div className="form-group mb-3">
-                    <label className="form-label">College Email</label>
-                    <input type="email" className={`form-input ${errors.email ? 'error-input' : ''}`} placeholder="student@college.edu" value={regData.email} onChange={e => handleInputChange('email', e.target.value.trim())} onBlur={() => validateRegister('email')} />
-                    {errors.email && <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>{errors.email}</div>}
-                  </div>
-                  <div className="form-group mb-3">
-                    <label className="form-label">Mobile</label>
-                    <input type="tel" className={`form-input ${errors.phone ? 'error-input' : ''}`} placeholder="10 digits" value={regData.phone} onChange={e => handleInputChange('phone', e.target.value.trim())} onBlur={() => validateRegister('phone')} />
-                    {errors.phone && <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>{errors.phone}</div>}
-                  </div>
-                </div>
-
-                <div className="form-group mb-3">
-                  <label className="form-label">Create Password</label>
-                  <input type="password" minLength="6" className={`form-input ${errors.password ? 'error-input' : ''}`} value={regData.password} onChange={e => handleInputChange('password', e.target.value)} onBlur={() => validateRegister('password')} />
-                  {errors.password && <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>{errors.password}</div>}
-                </div>
-
-                <div className="form-group mb-4">
-                  <label className="form-label">Confirm Password</label>
-                  <input type="password" minLength="6" className={`form-input ${errors.confirm_password ? 'error-input' : ''}`} value={regData.confirm_password} onChange={e => handleInputChange('confirm_password', e.target.value)} onBlur={() => validateRegister('confirm_password')} />
-                  {errors.confirm_password && <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>{errors.confirm_password}</div>}
-                </div>
-
-                <button type="submit" className="btn btn-primary w-full" disabled={loading} style={{ height: 46 }}>
-                  {loading ? <span className="spinner" /> : 'Create Student Account'}
-                </button>
-              </form>
-            )}
           </div>
         </div>
       )}

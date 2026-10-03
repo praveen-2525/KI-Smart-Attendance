@@ -13,7 +13,53 @@ export function StudentsListPage() {
   const [year, setYear] = useState('');
   const [section, setSection] = useState('');
   const [page, setPage] = useState(1);
+  const [showAddStudent, setShowAddStudent] = useState(false);
+  const [creatingStudent, setCreatingStudent] = useState(false);
+
+  const [studentForm, setStudentForm] = useState({
+    student_id: '',
+    full_name: '',
+    register_number: '',
+    roll_number: '',
+    email: '',
+    mobile_number: '',
+    department: 'CSE(AI&ML)',
+    year: 'III Year',
+    section: 'AIML',
+    date_of_birth: '',
+    advisor: '',
+    parent_name: '',
+    parent_contact: '',
+    account_status: 'ACTIVE',
+    password: '',
+  });
+
   const qc = useQueryClient();
+
+  const handleCreateStudent = async (e) => {
+    e.preventDefault();
+    if (!studentForm.full_name.trim() || !studentForm.register_number.trim() || !studentForm.roll_number || !studentForm.email) {
+      toast.error('Full Name, Register No, Roll No, and College Email are required.');
+      return;
+    }
+    setCreatingStudent(true);
+    try {
+      await usersApi.createStudent(studentForm);
+      toast.success(`Student account created for ${studentForm.full_name}!`);
+      setShowAddStudent(false);
+      setStudentForm({
+        student_id: '', full_name: '', register_number: '', roll_number: '',
+        email: '', mobile_number: '', department: 'CSE(AI&ML)', year: 'III Year',
+        section: 'AIML', date_of_birth: '', advisor: '', parent_name: '', parent_contact: '',
+        account_status: 'ACTIVE', password: '',
+      });
+      qc.invalidateQueries(['students-list']);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to create student account');
+    } finally {
+      setCreatingStudent(false);
+    }
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ['students-list', { search, year, section, page }],
@@ -35,12 +81,132 @@ export function StudentsListPage() {
 
   return (
     <div className="page-content animate-fade-in">
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 800, color: '#e2e8f0' }}>👥 Students</h2>
-        <p style={{ color: 'var(--gray-500)', fontSize: 14 }}>
-          {data?.total || 0} students registered
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+        <div>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: '#e2e8f0' }}>👥 Students</h2>
+          <p style={{ color: 'var(--gray-500)', fontSize: 14 }}>
+            {data?.total || 0} students registered
+          </p>
+        </div>
+        {user?.role === 'deo' && (
+          <button className="btn btn-primary" onClick={() => setShowAddStudent(!showAddStudent)}>
+            {showAddStudent ? 'Cancel' : '➕ Add Student'}
+          </button>
+        )}
       </div>
+
+      {showAddStudent && user?.role === 'deo' && (
+        <div className="card mb-6" style={{ borderColor: 'rgba(99,102,241,0.4)', background: 'var(--surface-dark-2)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#e2e8f0' }}>
+              👤 Create Complete Student Account
+            </h3>
+            <div style={{ background: 'rgba(16,185,129,0.15)', color: 'var(--success)', padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
+              Role: STUDENT (Auto-Enforced)
+            </div>
+          </div>
+
+          <form onSubmit={handleCreateStudent}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+              <div className="form-group">
+                <label className="form-label">Full Name *</label>
+                <input type="text" className="form-input" placeholder="e.g. Praveen S" value={studentForm.full_name}
+                  onChange={e => setStudentForm(f => ({ ...f, full_name: e.target.value }))} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Register Number * (12 Digits)</label>
+                <input type="text" className="form-input" placeholder="e.g. 7376241AI101" value={studentForm.register_number}
+                  onChange={e => setStudentForm(f => ({ ...f, register_number: e.target.value }))} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Roll Number *</label>
+                <input type="text" className="form-input" placeholder="e.g. 24AIM040" value={studentForm.roll_number}
+                  onChange={e => setStudentForm(f => ({ ...f, roll_number: e.target.value }))} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">College Email *</label>
+                <input type="email" className="form-input" placeholder="student@kitech.edu.in" value={studentForm.email}
+                  onChange={e => setStudentForm(f => ({ ...f, email: e.target.value }))} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Mobile Number *</label>
+                <input type="tel" className="form-input" placeholder="10-digit mobile number" value={studentForm.mobile_number}
+                  onChange={e => setStudentForm(f => ({ ...f, mobile_number: e.target.value }))} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Department *</label>
+                <select className="form-input" value={studentForm.department} onChange={e => setStudentForm(f => ({ ...f, department: e.target.value }))}>
+                  <option>CSE(AI&ML)</option>
+                  <option>CSE</option>
+                  <option>ECE</option>
+                  <option>EEE</option>
+                  <option>MECH</option>
+                  <option>CIVIL</option>
+                  <option>IT</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Year *</label>
+                <select className="form-input" value={studentForm.year} onChange={e => setStudentForm(f => ({ ...f, year: e.target.value }))}>
+                  <option value="I Year">I Year</option>
+                  <option value="II Year">II Year</option>
+                  <option value="III Year">III Year</option>
+                  <option value="IV Year">IV Year</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Section *</label>
+                <input type="text" className="form-input" placeholder="e.g. AIML, A, B" value={studentForm.section}
+                  onChange={e => setStudentForm(f => ({ ...f, section: e.target.value }))} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Date of Birth *</label>
+                <input type="date" className="form-input" value={studentForm.date_of_birth}
+                  onChange={e => setStudentForm(f => ({ ...f, date_of_birth: e.target.value }))} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Student ID (Optional)</label>
+                <input type="text" className="form-input" placeholder="Auto-generated if empty" value={studentForm.student_id}
+                  onChange={e => setStudentForm(f => ({ ...f, student_id: e.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Assigned Advisor</label>
+                <input type="text" className="form-input" placeholder="Advisor Name / ID" value={studentForm.advisor}
+                  onChange={e => setStudentForm(f => ({ ...f, advisor: e.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Initial / Temp Password</label>
+                <input type="password" className="form-input" placeholder="Default: Student@123" value={studentForm.password}
+                  onChange={e => setStudentForm(f => ({ ...f, password: e.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Parent / Guardian Name</label>
+                <input type="text" className="form-input" placeholder="Parent Name" value={studentForm.parent_name}
+                  onChange={e => setStudentForm(f => ({ ...f, parent_name: e.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Parent / Guardian Contact</label>
+                <input type="tel" className="form-input" placeholder="Parent 10-digit Phone" value={studentForm.parent_contact}
+                  onChange={e => setStudentForm(f => ({ ...f, parent_contact: e.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Account Status</label>
+                <select className="form-input" value={studentForm.account_status} onChange={e => setStudentForm(f => ({ ...f, account_status: e.target.value }))}>
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="INACTIVE">INACTIVE</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 20, display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowAddStudent(false)}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={creatingStudent}>
+                {creatingStudent ? <><span className="spinner" /> Creating Student Account...</> : '🚀 Create Student Account'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       <div className="card mb-6">
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -89,7 +255,7 @@ export function StudentsListPage() {
                     <th>Section</th>
                     <th>Email</th>
                     <th>Status</th>
-                    {['deo', 'hod'].includes(user?.role) && <th>Action</th>}
+                    {user?.role === 'deo' && <th>Action</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -108,7 +274,7 @@ export function StudentsListPage() {
                           {s.status || 'ACTIVE'}
                         </span>
                       </td>
-                      {['deo', 'hod'].includes(user?.role) && (
+                      {user?.role === 'deo' && (
                         <td>
                           <button
                             className={`btn btn-${s.status === 'ACTIVE' ? 'danger' : 'success'}`}

@@ -32,6 +32,162 @@ class InstitutionalUserCreate(BaseModel):
     office: Optional[str] = None
 
 
+class StudentAccountCreate(BaseModel):
+    student_id: Optional[str] = None
+    full_name: str
+    register_number: str
+    roll_number: str
+    email: str
+    mobile_number: str
+    department: str
+    year: str
+    section: str
+    date_of_birth: str
+    advisor: Optional[str] = ""
+    parent_name: Optional[str] = ""
+    parent_contact: Optional[str] = ""
+    account_status: str = "ACTIVE"
+    password: Optional[str] = None
+
+
+def format_dob_password(dob_raw: str) -> str:
+    """Extract DDMMYYYY from a date string (YYYY-MM-DD or DD-MM-YYYY or DD/MM/YYYY)."""
+    if not dob_raw:
+        return "15082005"
+    clean = dob_raw.strip()
+    import re
+    digits = re.sub(r"\D", "", clean)
+    if len(digits) == 8:
+        if clean.startswith("19") or clean.startswith("20"):
+            yyyy = digits[:4]
+            mm = digits[4:6]
+            dd = digits[6:8]
+            return f"{dd}{mm}{yyyy}"
+        else:
+            return digits
+    return "15082005"
+
+
+class StudentDeactivateRequest(BaseModel):
+    reason: Optional[str] = "Deactivated by DEO"
+
+
+@users_router.post("/students")
+@users_router.post("/student")
+async def create_student_account(
+    data: StudentAccountCreate,
+    current_user: models.User = Depends(require_roles(models.UserRole.DEO)),
+    mongo_db = Depends(get_db)
+):
+    import re
+    email = data.email.strip().lower()
+    reg_no = data.register_number.strip()
+    roll_no = data.roll_number.strip()
+    full_name = data.full_name.strip()
+    dob = data.date_of_birth.strip() if data.date_of_birth else ""
+
+    if not full_name or not reg_no or not roll_no or not email:
+        raise HTTPException(status_code=400, detail="Full Name, Register Number, Roll Number, and College Email are required.")
+
+    # Unique check across student_accounts and staff_accounts
+    existing_reg = await mongo_db["student_accounts"].find_one({"register_no": reg_no})
+    if existing_reg:
+        raise HTTPException(status_code=400, detail="Student already exists with this Register Number.")
+
+    existing_roll = await mongo_db["student_accounts"].find_one({"roll_number": roll_no})
+    if existing_roll:
+        raise HTTPException(status_code=400, detail="Student already exists with this Roll Number.")
+
+    existing_email = await mongo_db["student_accounts"].find_one({"email": email})
+    existing_staff_email = await mongo_db["staff_accounts"].find_one({"email": email})
+    if existing_email or existing_staff_email:
+        raise HTTPException(status_code=400, detail="A student account already exists with this email.")
+
+    if data.password and data.password.strip():
+        initial_pw = data.password.strip()
+    else:
+        initial_pw = format_dob_password(dob)
+
+    if len(initial_pw) < 6:
+        raise HTTPException(status_code=400, detail="Initial password must be at least 6 characters.")
+
+    pw_hash = get_password_hash(initial_pw)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    std_id = data.student_id.strip() if data.student_id and data.student_id.strip() else f"STU-{reg_no}"
+
+    student_doc = {
+        "student_id": std_id,
+        "name": full_name,
+        "fullName": full_name,
+        "register_no": reg_no,
+        "registerNumber": reg_no,
+        "roll_number": roll_no,
+        "rollNumber": roll_no,
+        "email": email,
+        "collegeEmail": email,
+        "phone": data.mobile_number.strip(),
+        "department": data.department.strip(),
+        "department_code": "AIML" if "AI" in data.department.upper() or "AIML" in data.department.upper() else data.department.strip(),
+        "year": data.year.strip(),
+        "section": data.section.strip(),
+        "date_of_birth": dob,
+        "advisor": data.advisor.strip() if data.advisor else "",
+        "parent_name": data.parent_name.strip() if data.parent_name else "",
+        "parent_contact": data.parent_contact.strip() if data.parent_contact else "",
+        "password_hash": pw_hash,
+        "passwordHash": pw_hash,
+        "role": "student",
+        "status": data.account_status.strip().upper(),
+        "accountStatus": data.account_status.strip().upper(),
+        "first_login": False,
+        "created_at": now_iso,
+        "updated_at": now_iso,
+        "created_by": str(current_user.id),
+        "createdByDEO": True
+    }
+
+    result = await mongo_db["student_accounts"].insert_one(student_doc)
+    doc_id = str(result.inserted_id)
+
+    # Also keep student_master up to date
+    await mongo_db["student_master"].update_one(
+        {"register_no": reg_no},
+        {"$set": {
+            "register_no": reg_no,
+            "name": full_name,
+            "date_of_birth": dob,
+            "department": data.department.strip(),
+            "year": data.year.strip(),
+            "section": data.section.strip(),
+            "email": email,
+            "phone": data.mobile_number.strip(),
+            "status": "REGISTERED"
+        }},
+        upsert=True
+    )
+
+    # Log to audit_logs
+    await mongo_db["audit_logs"].insert_one({
+        "action": "STUDENT_CREATED_BY_DEO",
+        "entity_type": "student_account",
+        "entity_id": doc_id,
+        "user_id": str(current_user.id),
+        "user_role": str(current_user.role),
+        "student_id": std_id,
+        "register_no": reg_no,
+        "created_at": now_iso
+    })
+
+    return {
+        "message": f"Student account created successfully for {full_name}.",
+        "id": doc_id,
+        "student_id": std_id,
+        "register_no": reg_no,
+        "email": email,
+        "status": data.account_status.strip().upper()
+    }
+
+
 @users_router.post("/institutional")
 async def create_institutional_user(
     data: InstitutionalUserCreate,
@@ -82,11 +238,12 @@ async def list_students(
     department: Optional[str] = None,
     year: Optional[str] = None,
     section: Optional[str] = None,
+    status: Optional[str] = None,
     search: Optional[str] = None,
     page: int = Query(1, ge=1),
     limit: int = Query(50, le=200),
     current_user: models.User = Depends(require_roles(
-        models.UserRole.DEO, models.UserRole.HOD, models.UserRole.ADVISOR
+        models.UserRole.DEO, models.UserRole.HOD, models.UserRole.ADVISOR, models.UserRole.FACULTY, models.UserRole.STAFF
     )),
     mongo_db = Depends(get_db)
 ):
@@ -97,18 +254,21 @@ async def list_students(
         query_filter["year"] = year
     if section:
         query_filter["section"] = section
+    if status:
+        query_filter["status"] = status.upper()
     if search:
         query_filter["$or"] = [
             {"name": {"$regex": search, "$options": "i"}},
             {"register_no": {"$regex": search, "$options": "i"}},
-            {"roll_number": {"$regex": search, "$options": "i"}}
+            {"roll_number": {"$regex": search, "$options": "i"}},
+            {"email": {"$regex": search, "$options": "i"}}
         ]
 
     total = await mongo_db["student_accounts"].count_documents(query_filter)
     skip = (page - 1) * limit
     students = await mongo_db["student_accounts"].find(
         query_filter,
-        {"password_hash": 0}  # Never return password hash
+        {"password_hash": 0, "passwordHash": 0}  # Never return password hash
     ).skip(skip).limit(limit).to_list(length=limit)
 
     for s in students:
@@ -146,7 +306,7 @@ async def list_staff(
     skip = (page - 1) * limit
     staff = await mongo_db["staff_accounts"].find(
         query_filter,
-        {"password_hash": 0}  # Never return password hash
+        {"password_hash": 0, "passwordHash": 0}  # Never return password hash
     ).skip(skip).limit(limit).to_list(length=limit)
 
     for s in staff:
@@ -232,8 +392,74 @@ async def import_students(
     }
 
 
+@users_router.post("/students/{user_id}/deactivate")
 @users_router.put("/{user_id}/toggle-status")
 async def toggle_user_status(
+    user_id: str,
+    deactivate_data: Optional[StudentDeactivateRequest] = None,
+    current_user: models.User = Depends(require_roles(models.UserRole.DEO)),
+    mongo_db = Depends(get_db)
+):
+    from bson import ObjectId
+    query_filter = {}
+    if ObjectId.is_valid(user_id):
+        query_filter["_id"] = ObjectId(user_id)
+    else:
+        query_filter["$or"] = [
+            {"register_no": user_id},
+            {"student_id": user_id},
+            {"email": user_id.lower()}
+        ]
+
+    student = await mongo_db["student_accounts"].find_one(query_filter)
+    if not student:
+        raise HTTPException(status_code=404, detail="Student account not found")
+
+    current_status = student.get("status", "ACTIVE").upper()
+    new_status = "INACTIVE" if current_status == "ACTIVE" else "ACTIVE"
+    reason = (deactivate_data.reason.strip() if deactivate_data and deactivate_data.reason else "Deactivated by DEO") if new_status == "INACTIVE" else ""
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    update_fields = {
+        "status": new_status,
+        "accountStatus": new_status,
+        "updated_at": now_iso
+    }
+    if new_status == "INACTIVE":
+        update_fields["deactivatedAt"] = now_iso
+        update_fields["deactivated_at"] = now_iso
+        update_fields["deactivatedBy"] = current_user.login_id
+        update_fields["deactivated_by"] = current_user.login_id
+        update_fields["deactivationReason"] = reason
+        update_fields["deactivation_reason"] = reason
+
+    await mongo_db["student_accounts"].update_one(
+        {"_id": student["_id"]},
+        {"$set": update_fields}
+    )
+
+    # Log to audit_logs
+    await mongo_db["audit_logs"].insert_one({
+        "action": "STUDENT_DEACTIVATED" if new_status == "INACTIVE" else "STUDENT_ACTIVATED",
+        "entity_type": "student_account",
+        "entity_id": str(student["_id"]),
+        "user_id": str(current_user.id),
+        "deactivated_by": current_user.login_id,
+        "reason": reason,
+        "created_at": now_iso
+    })
+
+    return {
+        "message": f"Student account {'deactivated' if new_status == 'INACTIVE' else 'activated'} successfully.",
+        "status": new_status,
+        "student_id": str(student["_id"]),
+        "register_no": student.get("register_no")
+    }
+
+
+@users_router.delete("/students/{user_id}")
+@users_router.delete("/student/{user_id}")
+async def delete_student_account(
     user_id: str,
     current_user: models.User = Depends(require_roles(models.UserRole.DEO)),
     mongo_db = Depends(get_db)
@@ -243,20 +469,86 @@ async def toggle_user_status(
     if ObjectId.is_valid(user_id):
         query_filter["_id"] = ObjectId(user_id)
     else:
-        query_filter["register_no"] = user_id
+        query_filter["$or"] = [
+            {"register_no": user_id},
+            {"registerNumber": user_id},
+            {"student_id": user_id},
+            {"email": user_id.lower()},
+            {"collegeEmail": user_id.lower()},
+            {"roll_number": user_id},
+            {"rollNumber": user_id}
+        ]
 
     student = await mongo_db["student_accounts"].find_one(query_filter)
     if not student:
-        raise HTTPException(status_code=404, detail="User not found")
+        student = await mongo_db["users"].find_one(query_filter)
 
-    current_status = student.get("status", "ACTIVE")
-    new_status = "INACTIVE" if current_status == "ACTIVE" else "ACTIVE"
+    if not student:
+        raise HTTPException(status_code=404, detail="Student account not found in database.")
 
-    await mongo_db["student_accounts"].update_one(
-        query_filter,
-        {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}}
-    )
-    return {"message": f"User {'activated' if new_status == 'ACTIVE' else 'deactivated'}", "status": new_status}
+    doc_id_str = str(student["_id"])
+    reg_no = student.get("register_no") or student.get("registerNumber") or ""
+    roll_no = student.get("roll_number") or student.get("rollNumber") or ""
+    email = (student.get("email") or student.get("collegeEmail") or "").strip().lower()
+    student_name = student.get("name") or student.get("fullName") or "Student"
+
+    # 1. Permanently remove from student_accounts & users collections
+    await mongo_db["student_accounts"].delete_many({
+        "$or": [
+            {"_id": student["_id"]},
+            {"register_no": reg_no} if reg_no else {"_id": None},
+            {"email": email} if email else {"_id": None}
+        ]
+    })
+
+    await mongo_db["users"].delete_many({
+        "$or": [
+            {"login_id": reg_no} if reg_no else {"_id": None},
+            {"login_id": email} if email else {"_id": None},
+            {"email": email} if email else {"_id": None}
+        ]
+    })
+
+    # 2. Delete master registration record if existing
+    if reg_no:
+        await mongo_db["student_master"].delete_many({"register_no": reg_no})
+
+    # 3. Clean up associated notifications
+    notif_filter = {"$or": [{"user_id": doc_id_str}]}
+    if email:
+        notif_filter["$or"].append({"email": email})
+    await mongo_db["notifications"].delete_many(notif_filter)
+
+    # 4. Clean up leave, OD, late arrival requests and corrections
+    req_filter = {"$or": [{"studentId": doc_id_str}]}
+    if reg_no:
+        req_filter["$or"].append({"registerNumber": reg_no})
+        req_filter["$or"].append({"register_no": reg_no})
+    await mongo_db["leave_requests"].delete_many(req_filter)
+    await mongo_db["od_requests"].delete_many(req_filter)
+    await mongo_db["late_arrival_requests"].delete_many(req_filter)
+    await mongo_db["attendance_corrections"].delete_many(req_filter)
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # Log to audit_logs
+    await mongo_db["audit_logs"].insert_one({
+        "action": "STUDENT_PERMANENTLY_DELETED",
+        "entity_type": "student_account",
+        "entity_id": doc_id_str,
+        "user_id": str(current_user.id),
+        "deleted_by": current_user.login_id,
+        "student_name": student_name,
+        "register_no": reg_no,
+        "email": email,
+        "created_at": now_iso
+    })
+
+    return {
+        "message": f"Student {student_name} ({reg_no}) permanently deleted successfully.",
+        "student_id": doc_id_str,
+        "register_no": reg_no
+    }
 
 
 # ============================================================

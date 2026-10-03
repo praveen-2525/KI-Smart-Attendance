@@ -129,6 +129,7 @@ async def _process_leave_submission(
         "studentId": str(student_doc["_id"]),
         "studentName": student_doc["name"],
         "registerNumber": student_doc["register_no"],
+        "rollNumber": student_doc.get("roll_number", ""),
         "department": student_doc.get("department", "CSE(AI&ML)"),
         "year": student_doc.get("year", "III Year"),
         "section": student_doc.get("section", "AIML"),
@@ -144,18 +145,66 @@ async def _process_leave_submission(
         "emergencyContact": emergency_contact.strip() if emergency_contact else "",
         "remarks": remarks.strip() if remarks else "",
         "status": "Pending",
+        "advisorStatus": "PENDING",
+        "hodStatus": "ACTION_REQUIRED",
+        "approvalType": None,
+        "approvedBy": None,
+        "approvedByRole": None,
         "submittedAt": now_iso,
         "updatedAt": now_iso,
         "reviewedBy": None,
         "reviewedAt": None,
-        "reviewerRemarks": None
+        "reviewerRemarks": None,
+        "approvalHistory": [
+            {
+                "action": "SUBMITTED",
+                "userId": str(student_doc["_id"]),
+                "role": "STUDENT",
+                "timestamp": now_iso
+            }
+        ]
     }
 
     result = await mongo_db["leave_requests"].insert_one(leave_record)
+    doc_id = str(result.inserted_id)
+
+    # 1. Notify HOD of student's department
+    dept = student_doc.get("department", "")
+    hod_accounts = await mongo_db["staff_accounts"].find({"role": "hod"}).to_list(length=10)
+    for hod in hod_accounts:
+        if not dept or hod.get("department", "").upper() == dept.upper() or "AI" in hod.get("department", "").upper():
+            await mongo_db["notifications"].insert_one({
+                "user_id": str(hod["_id"]),
+                "email": hod.get("email"),
+                "category": "LEAVE_REQUEST",
+                "title": f"New Leave Request: {student_doc['name']}",
+                "message": f"{student_doc['name']} ({student_doc['register_no']}) submitted a {leave_type} ({from_date} to {to_date}). Advisor: Pending | HOD: Action Required.",
+                "reference_type": "leave_request",
+                "reference_id": request_id,
+                "is_read": False,
+                "created_at": now_iso
+            })
+
+    # 2. Notify Advisors
+    advisors = await mongo_db["staff_accounts"].find({"role": "advisor"}).to_list(length=10)
+    for adv in advisors:
+        if not dept or adv.get("department", "").upper() == dept.upper() or "AI" in adv.get("department", "").upper():
+            await mongo_db["notifications"].insert_one({
+                "user_id": str(adv["_id"]),
+                "email": adv.get("email"),
+                "category": "LEAVE_REQUEST",
+                "title": f"New Leave Request: {student_doc['name']}",
+                "message": f"{student_doc['name']} ({student_doc['register_no']}) submitted a {leave_type}.",
+                "reference_type": "leave_request",
+                "reference_id": request_id,
+                "is_read": False,
+                "created_at": now_iso
+            })
+
     return {
         "message": "Leave request submitted successfully.",
         "requestId": request_id,
-        "id": str(result.inserted_id),
+        "id": doc_id,
         "status": "Pending"
     }
 
@@ -172,7 +221,7 @@ async def create_leave_request(
     emergencyContact: Optional[str] = Form(""),
     remarks: Optional[str] = Form(""),
     document: Optional[UploadFile] = File(None),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_roles(models.UserRole.STUDENT)),
     mongo_db = Depends(get_db)
 ):
     return await _process_leave_submission(
@@ -199,7 +248,8 @@ async def get_my_leave_requests(
     requests = await mongo_db["leave_requests"].find({
         "$or": [
             {"registerNumber": current_user.login_id},
-            {"studentId": str(current_user.id)}
+            {"studentId": str(current_user.id)},
+            {"collegeEmail": current_user.email.lower() if current_user.email else ""}
         ]
     }).sort("submittedAt", -1).to_list(length=200)
 
@@ -213,14 +263,64 @@ async def get_my_leave_requests(
 @leave_router.get("/leave-requests/pending")
 @leave_router.get("/leave/pending")
 async def get_pending_leave_requests(
+    status_filter: Optional[str] = Query(None, alias="status"),
+    department: Optional[str] = None,
+    year: Optional[str] = None,
+    section: Optional[str] = None,
+    search: Optional[str] = None,
+    approval_type: Optional[str] = None,
     current_user: models.User = Depends(require_roles(
         models.UserRole.ADVISOR, models.UserRole.HOD, models.UserRole.DEO
     )),
     mongo_db = Depends(get_db)
 ):
-    requests = await mongo_db["leave_requests"].find({
-        "status": "Pending"
-    }).sort("submittedAt", -1).to_list(length=200)
+    user_role = str(current_user.role).lower()
+    query_filter = {}
+
+    # Department Scope Enforcement for HOD & Advisor
+    if user_role in ["hod", "advisor"]:
+        staff_doc = await mongo_db["staff_accounts"].find_one({
+            "$or": [{"email": current_user.email.lower() if current_user.email else ""}, {"login_id": current_user.login_id}]
+        })
+        user_dept = staff_doc.get("department") if staff_doc else None
+        if user_dept:
+            query_filter["$or"] = [
+                {"department": user_dept},
+                {"department": {"$regex": user_dept, "$options": "i"}}
+            ]
+            if "AI" in user_dept.upper() or "AIML" in user_dept.upper():
+                query_filter["$or"].extend([
+                    {"department": "CSE(AI&ML)"},
+                    {"department": "AIML"}
+                ])
+
+    if department:
+        query_filter["department"] = department
+    if year:
+        query_filter["year"] = year
+    if section:
+        query_filter["section"] = section
+    if approval_type:
+        query_filter["approvalType"] = approval_type
+
+    if status_filter:
+        if status_filter.lower() != "all":
+            query_filter["status"] = status_filter
+    else:
+        query_filter["status"] = "Pending"
+
+    if search:
+        search_or = [
+            {"studentName": {"$regex": search, "$options": "i"}},
+            {"registerNumber": {"$regex": search, "$options": "i"}},
+            {"leaveType": {"$regex": search, "$options": "i"}}
+        ]
+        if "$or" in query_filter:
+            query_filter["$and"] = [{"$or": query_filter.pop("$or")}, {"$or": search_or}]
+        else:
+            query_filter["$or"] = search_or
+
+    requests = await mongo_db["leave_requests"].find(query_filter).sort("submittedAt", -1).to_list(length=200)
 
     for r in requests:
         r["id"] = str(r["_id"])
@@ -245,6 +345,15 @@ async def get_leave_request_detail(
     if not leave:
         raise HTTPException(status_code=404, detail="Leave request not found")
 
+    # Enforce Student Data Security
+    if str(current_user.role).lower() == "student":
+        if (
+            leave.get("registerNumber") != current_user.login_id
+            and leave.get("studentId") != str(current_user.id)
+            and leave.get("collegeEmail", "").lower() != (current_user.email or "").lower()
+        ):
+            raise HTTPException(status_code=403, detail="Access denied. You can only view your own leave requests.")
+
     leave["id"] = str(leave["_id"])
     del leave["_id"]
     return leave
@@ -265,13 +374,30 @@ async def cancel_leave_request(
     if not leave:
         raise HTTPException(status_code=404, detail="Leave request not found")
 
+    if str(current_user.role).lower() == "student":
+        if (
+            leave.get("registerNumber") != current_user.login_id
+            and leave.get("studentId") != str(current_user.id)
+        ):
+            raise HTTPException(status_code=403, detail="Access denied. You can only cancel your own leave requests.")
+
     if leave.get("status") != "Pending":
         raise HTTPException(status_code=400, detail="Only pending requests can be cancelled.")
 
     now_iso = datetime.now(timezone.utc).isoformat()
     await mongo_db["leave_requests"].update_one(
         {"_id": leave["_id"]},
-        {"$set": {"status": "Cancelled", "updatedAt": now_iso}}
+        {
+            "$set": {"status": "Cancelled", "updatedAt": now_iso},
+            "$push": {
+                "approvalHistory": {
+                    "action": "CANCELLED",
+                    "userId": str(current_user.id),
+                    "role": str(current_user.role).upper(),
+                    "timestamp": now_iso
+                }
+            }
+        }
     )
     return {"message": "Leave request cancelled successfully.", "status": "Cancelled"}
 
@@ -282,7 +408,7 @@ async def review_leave_request(
     status: str = Form(...),  # "Approved" or "Rejected"
     reviewerRemarks: Optional[str] = Form(""),
     current_user: models.User = Depends(require_roles(
-        models.UserRole.ADVISOR, models.UserRole.HOD
+        models.UserRole.ADVISOR, models.UserRole.HOD, models.UserRole.DEO
     )),
     mongo_db = Depends(get_db)
 ):
@@ -298,30 +424,347 @@ async def review_leave_request(
     if not leave:
         raise HTTPException(status_code=404, detail="Leave request not found")
 
+    user_role = str(current_user.role).lower()
     now_iso = datetime.now(timezone.utc).isoformat()
-    await mongo_db["leave_requests"].update_one(
-        {"_id": leave["_id"]},
-        {"$set": {
-            "status": status,
-            "reviewedBy": current_user.full_name or current_user.login_id,
-            "reviewedAt": now_iso,
-            "reviewerRemarks": reviewerRemarks,
-            "updatedAt": now_iso
-        }}
-    )
 
-    # Log to audit_logs in MongoDB
-    await mongo_db["audit_logs"].insert_one({
-        "action": f"LEAVE_{status.upper()}",
-        "entity_type": "leave_request",
-        "entity_id": str(leave["_id"]),
-        "user_id": str(current_user.id),
-        "user_role": str(current_user.role),
-        "reason": reviewerRemarks or "",
-        "created_at": now_iso
-    })
+    # Prevent duplicate approval actions if request is already processed by HOD
+    if leave.get("status") in ["Approved", "Rejected"] or leave.get("hodStatus") in ["APPROVED", "REJECTED"]:
+        raise HTTPException(status_code=400, detail="This request has already been processed by HOD.")
 
-    return {"message": f"Leave request {status.lower()} successfully.", "status": status}
+    # 1. HOD ACTION (Direct or Final Approval/Rejection)
+    if user_role == "hod":
+        # Department Security Check
+        staff_doc = await mongo_db["staff_accounts"].find_one({
+            "$or": [{"email": current_user.email.lower() if current_user.email else ""}, {"login_id": current_user.login_id}]
+        })
+        hod_dept = staff_doc.get("department", "") if staff_doc else ""
+        req_dept = leave.get("department", "")
+
+        if hod_dept and req_dept and hod_dept.upper() not in req_dept.upper() and req_dept.upper() not in hod_dept.upper():
+            if not ("AI" in hod_dept.upper() and "AI" in req_dept.upper()):
+                raise HTTPException(status_code=403, detail=f"Security Violation: HOD from {hod_dept} cannot process requests for department {req_dept}.")
+
+        advisor_status_curr = leave.get("advisorStatus", "PENDING")
+        if status == "Approved":
+            approval_type = "HOD_DIRECT_APPROVAL" if advisor_status_curr == "PENDING" else "NORMAL_HOD_APPROVAL"
+            adv_status_new = "BYPASSED" if advisor_status_curr == "PENDING" else advisor_status_curr
+
+            await mongo_db["leave_requests"].update_one(
+                {"_id": leave["_id"]},
+                {
+                    "$set": {
+                        "status": "Approved",
+                        "hodStatus": "APPROVED",
+                        "advisorStatus": adv_status_new,
+                        "approvalType": approval_type,
+                        "approvedBy": current_user.full_name or current_user.login_id,
+                        "approvedByRole": "HOD",
+                        "reviewedBy": current_user.full_name or current_user.login_id,
+                        "reviewedAt": now_iso,
+                        "reviewerRemarks": reviewerRemarks or "",
+                        "updatedAt": now_iso
+                    },
+                    "$push": {
+                        "approvalHistory": {
+                            "action": "APPROVED",
+                            "userId": str(current_user.id),
+                            "role": "HOD",
+                            "approvalType": approval_type,
+                            "timestamp": now_iso,
+                            "remarks": reviewerRemarks or ""
+                        }
+                    }
+                }
+            )
+
+            # Notify Student
+            notif_msg = f"Your leave request from {leave.get('fromDate')} to {leave.get('toDate')} was approved directly by HOD." if approval_type == "HOD_DIRECT_APPROVAL" else f"Your leave request was approved by HOD."
+            await mongo_db["notifications"].insert_one({
+                "user_id": leave.get("studentId"),
+                "email": leave.get("collegeEmail"),
+                "category": "LEAVE_APPROVAL",
+                "title": "Leave Request Approved",
+                "message": notif_msg,
+                "reference_type": "leave_request",
+                "reference_id": leave.get("requestId"),
+                "is_read": False,
+                "created_at": now_iso
+            })
+
+            return {
+                "message": "Leave request approved directly by HOD.",
+                "status": "Approved",
+                "approvalType": approval_type,
+                "approvedBy": current_user.full_name or current_user.login_id
+            }
+
+        else: # HOD Rejects
+            approval_type = "HOD_DIRECT_REJECTION"
+            await mongo_db["leave_requests"].update_one(
+                {"_id": leave["_id"]},
+                {
+                    "$set": {
+                        "status": "Rejected",
+                        "hodStatus": "REJECTED",
+                        "approvalType": approval_type,
+                        "approvedBy": current_user.full_name or current_user.login_id,
+                        "approvedByRole": "HOD",
+                        "reviewedBy": current_user.full_name or current_user.login_id,
+                        "reviewedAt": now_iso,
+                        "reviewerRemarks": reviewerRemarks or "",
+                        "updatedAt": now_iso
+                    },
+                    "$push": {
+                        "approvalHistory": {
+                            "action": "REJECTED",
+                            "userId": str(current_user.id),
+                            "role": "HOD",
+                            "approvalType": approval_type,
+                            "timestamp": now_iso,
+                            "remarks": reviewerRemarks or ""
+                        }
+                    }
+                }
+            )
+
+            # Notify Student
+            await mongo_db["notifications"].insert_one({
+                "user_id": leave.get("studentId"),
+                "email": leave.get("collegeEmail"),
+                "category": "LEAVE_APPROVAL",
+                "title": "Leave Request Rejected",
+                "message": f"Your leave request was rejected by HOD. Remarks: {reviewerRemarks or 'None'}",
+                "reference_type": "leave_request",
+                "reference_id": leave.get("requestId"),
+                "is_read": False,
+                "created_at": now_iso
+            })
+
+            return {"message": "Leave request rejected by HOD.", "status": "Rejected", "approvalType": approval_type}
+
+    # 2. ADVISOR ACTION
+    elif user_role == "advisor":
+        if status == "Approved":
+            await mongo_db["leave_requests"].update_one(
+                {"_id": leave["_id"]},
+                {
+                    "$set": {
+                        "advisorStatus": "APPROVED",
+                        "approvalType": "ADVISOR_APPROVAL",
+                        "approvedBy": current_user.full_name or current_user.login_id,
+                        "approvedByRole": "ADVISOR",
+                        "hodStatus": "ACTION_REQUIRED",
+                        "reviewedBy": current_user.full_name or current_user.login_id,
+                        "reviewedAt": now_iso,
+                        "reviewerRemarks": reviewerRemarks or "",
+                        "updatedAt": now_iso
+                    },
+                    "$push": {
+                        "approvalHistory": {
+                            "action": "APPROVED",
+                            "userId": str(current_user.id),
+                            "role": "ADVISOR",
+                            "approvalType": "ADVISOR_APPROVAL",
+                            "timestamp": now_iso,
+                            "remarks": reviewerRemarks or ""
+                        }
+                    }
+                }
+            )
+
+            # Notify HOD
+            dept = leave.get("department", "")
+            hod_accounts = await mongo_db["staff_accounts"].find({"role": "hod"}).to_list(length=10)
+            for hod in hod_accounts:
+                if not dept or hod.get("department", "").upper() == dept.upper() or "AI" in hod.get("department", "").upper():
+                    await mongo_db["notifications"].insert_one({
+                        "user_id": str(hod["_id"]),
+                        "email": hod.get("email"),
+                        "category": "LEAVE_REQUEST",
+                        "title": f"Advisor Approved Leave: {leave.get('studentName')}",
+                        "message": f"Advisor approved leave request for {leave.get('studentName')} ({leave.get('registerNumber')}). HOD approval required.",
+                        "reference_type": "leave_request",
+                        "reference_id": leave.get("requestId"),
+                        "is_read": False,
+                        "created_at": now_iso
+                    })
+
+            return {"message": "Leave request approved by Advisor. Sent for HOD final review.", "status": "Pending", "advisorStatus": "APPROVED"}
+
+        else: # Advisor Rejects
+            await mongo_db["leave_requests"].update_one(
+                {"_id": leave["_id"]},
+                {
+                    "$set": {
+                        "status": "Rejected",
+                        "advisorStatus": "REJECTED",
+                        "approvalType": "ADVISOR_REJECTION",
+                        "approvedBy": current_user.full_name or current_user.login_id,
+                        "approvedByRole": "ADVISOR",
+                        "reviewedBy": current_user.full_name or current_user.login_id,
+                        "reviewedAt": now_iso,
+                        "reviewerRemarks": reviewerRemarks or "",
+                        "updatedAt": now_iso
+                    },
+                    "$push": {
+                        "approvalHistory": {
+                            "action": "REJECTED",
+                            "userId": str(current_user.id),
+                            "role": "ADVISOR",
+                            "approvalType": "ADVISOR_REJECTION",
+                            "timestamp": now_iso,
+                            "remarks": reviewerRemarks or ""
+                        }
+                    }
+                }
+            )
+
+            # Notify Student
+            await mongo_db["notifications"].insert_one({
+                "user_id": leave.get("studentId"),
+                "email": leave.get("collegeEmail"),
+                "category": "LEAVE_APPROVAL",
+                "title": "Leave Request Rejected",
+                "message": f"Your leave request was rejected by Advisor.",
+                "reference_type": "leave_request",
+                "reference_id": leave.get("requestId"),
+                "is_read": False,
+                "created_at": now_iso
+            })
+
+            return {"message": "Leave request rejected by Advisor.", "status": "Rejected"}
+
+    # DEO / Admin fallback
+    else:
+        await mongo_db["leave_requests"].update_one(
+            {"_id": leave["_id"]},
+            {
+                "$set": {
+                    "status": status,
+                    "approvedBy": current_user.full_name or current_user.login_id,
+                    "approvedByRole": str(current_user.role).upper(),
+                    "reviewedBy": current_user.full_name or current_user.login_id,
+                    "reviewedAt": now_iso,
+                    "reviewerRemarks": reviewerRemarks or "",
+                    "updatedAt": now_iso
+                }
+            }
+        )
+        return {"message": f"Leave request {status.lower()} by DEO.", "status": status}
+
+
+@leave_router.get("/leave-requests/approved")
+async def get_approved_leave_requests(
+    selected_date: Optional[str] = Query(None, alias="date"),
+    from_date: Optional[str] = Query(None, alias="fromDate"),
+    to_date: Optional[str] = Query(None, alias="toDate"),
+    department: Optional[str] = None,
+    year: Optional[str] = None,
+    section: Optional[str] = None,
+    search: Optional[str] = None,
+    leave_type_filter: Optional[str] = Query(None, alias="leaveType"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=200),
+    current_user: models.User = Depends(require_roles(
+        models.UserRole.ADVISOR, models.UserRole.HOD, models.UserRole.FACULTY,
+        models.UserRole.STAFF, models.UserRole.DEO
+    )),
+    mongo_db = Depends(get_db)
+):
+    """
+    Get approved Leave records for a specific date (or date range).
+    Only shows requests where: status=Approved AND selectedDate is within [fromDate, toDate].
+    """
+    from datetime import date as date_cls
+    user_role = str(current_user.role).lower()
+
+    today_str = date_cls.today().isoformat()
+    check_date = selected_date if selected_date else today_str
+
+    query_filter = {"status": "Approved"}
+
+    if from_date and to_date:
+        if "$and" not in query_filter:
+            query_filter["$and"] = []
+        query_filter["$and"].extend([
+            {"fromDate": {"$lte": to_date}},
+            {"toDate": {"$gte": from_date}}
+        ])
+    else:
+        query_filter["fromDate"] = {"$lte": check_date}
+        query_filter["toDate"] = {"$gte": check_date}
+
+    # Department scope for HOD and Advisor
+    if user_role in ["hod", "advisor"]:
+        staff_doc = await mongo_db["staff_accounts"].find_one({
+            "$or": [
+                {"email": current_user.email.lower() if current_user.email else ""},
+                {"login_id": current_user.login_id}
+            ]
+        })
+        user_dept = staff_doc.get("department") if staff_doc else None
+        if user_dept:
+            dept_filter = [
+                {"department": user_dept},
+                {"department": {"$regex": user_dept, "$options": "i"}}
+            ]
+            if "AI" in user_dept.upper() or "AIML" in user_dept.upper():
+                dept_filter.extend([
+                    {"department": "CSE(AI&ML)"},
+                    {"department": "AIML"}
+                ])
+            if "$and" in query_filter:
+                query_filter["$and"].append({"$or": dept_filter})
+            else:
+                query_filter["$or"] = dept_filter
+
+    if department:
+        query_filter["department"] = department
+    if year:
+        query_filter["year"] = year
+    if section:
+        query_filter["section"] = section
+    if leave_type_filter:
+        query_filter["leaveType"] = leave_type_filter
+
+    if search:
+        search_or = [
+            {"studentName": {"$regex": search, "$options": "i"}},
+            {"registerNumber": {"$regex": search, "$options": "i"}},
+            {"rollNumber": {"$regex": search, "$options": "i"}}
+        ]
+        if "$or" in query_filter:
+            existing_or = query_filter.pop("$or")
+            if "$and" not in query_filter:
+                query_filter["$and"] = []
+            query_filter["$and"].extend([{"$or": existing_or}, {"$or": search_or}])
+        elif "$and" in query_filter:
+            query_filter["$and"].append({"$or": search_or})
+        else:
+            query_filter["$or"] = search_or
+
+    skip = (page - 1) * limit
+    total = await mongo_db["leave_requests"].count_documents(query_filter)
+    records = await mongo_db["leave_requests"].find(query_filter).sort(
+        [("fromDate", 1), ("studentName", 1)]
+    ).skip(skip).limit(limit).to_list(length=limit)
+
+    for r in records:
+        r["id"] = str(r["_id"])
+        del r["_id"]
+
+    return {
+        "records": records,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "selectedDate": check_date,
+        "totalPages": max(1, (total + limit - 1) // limit)
+    }
+
+
+
+
 
 
 # ============================================================
