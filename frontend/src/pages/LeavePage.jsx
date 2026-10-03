@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { leaveApi } from '../services/api';
+import { leaveApi, API_BASE_URL } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -615,7 +615,7 @@ export default function LeavePage() {
                 <div style={{ background: 'var(--surface-dark-4)', padding: 12, borderRadius: 8, fontSize: 13, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>📄 Supporting Document Uploaded</span>
                   <a
-                    href={`http://localhost:8000${selectedRequest.supportingDocument}`}
+                    href={`${API_BASE_URL}${selectedRequest.supportingDocument}`}
                     target="_blank"
                     rel="noreferrer"
                     className="btn btn-sm btn-secondary"

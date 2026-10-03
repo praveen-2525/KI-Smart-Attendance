@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getRoleDashboardPath } from '../utils/roleRedirect';
 import toast from 'react-hot-toast';
+import { API_BASE_URL } from '../services/api';
 
 const ROLES = [
   {
@@ -200,7 +201,7 @@ export default function AuthFlowPage() {
 
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/v1/auth/register', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(regData)

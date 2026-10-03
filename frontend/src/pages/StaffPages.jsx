@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { usersApi, notifApi, timetableApi, adminApi } from '../services/api';
+import { usersApi, notifApi, timetableApi, adminApi, API_BASE_URL } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -870,7 +870,7 @@ export function ClassesPage() {
                           onClick={async () => {
                             try {
                               const encoded = encodeURIComponent(s.section_name);
-                              await fetch(`http://localhost:8000/api/v1/admin/config/sections/${encoded}/toggle`, {
+                              await fetch(`${API_BASE_URL}/api/v1/admin/config/sections/${encoded}/toggle`, {
                                 method: 'PUT',
                                 headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
                               });
