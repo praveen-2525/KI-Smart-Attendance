@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { authApi } from '../services/api';
@@ -50,16 +50,16 @@ export default function ChangePasswordPage() {
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <div style={{
             width: 50, height: 50, borderRadius: 12,
-            background: 'rgba(99,102,241,0.1)', color: 'var(--primary-400)',
+            background: 'rgba(99,102,241,0.1)', color: 'var(--secondary)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 24, margin: '0 auto 16px'
           }}>
             🔒
           </div>
-          <h2 style={{ fontSize: 24, fontWeight: 800, color: '#e2e8f0', marginBottom: 8 }}>
+          <h2 style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8 }}>
             Change Password
           </h2>
-          <p style={{ color: 'var(--gray-400)', fontSize: 14 }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
             For security reasons, you must change your password before continuing.
           </p>
         </div>
@@ -124,3 +124,4 @@ export default function ChangePasswordPage() {
     </div>
   );
 }
+

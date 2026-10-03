@@ -6,60 +6,23 @@ import toast from 'react-hot-toast';
 import { API_BASE_URL } from '../services/api';
 
 const ROLES = [
-  {
-    id: 'student',
-    title: 'Student',
-    icon: '👨‍🎓',
-    desc: 'Access attendance, OD, leave and personal requests',
-    badge: 'Student Portal'
-  },
-  {
-    id: 'hod',
-    title: 'HOD',
-    icon: '👨‍💼',
-    desc: 'Manage department students, attendance and approvals',
-    badge: 'Department Head'
-  },
-  {
-    id: 'advisor',
-    title: 'Advisor',
-    icon: '👨‍🏫',
-    desc: 'Manage assigned students and requests',
-    badge: 'Class Advisor'
-  },
-  {
-    id: 'faculty',
-    title: 'Faculty',
-    icon: '👩‍🏫',
-    desc: 'Manage classes, attendance and approved requests',
-    badge: 'Faculty Member'
-  },
-  {
-    id: 'staff',
-    title: 'Staff',
-    icon: '👨‍💻',
-    desc: 'View approved OD and leave information',
-    badge: 'Office Staff'
-  },
-  {
-    id: 'deo',
-    title: 'DEO',
-    icon: '🧑‍💼',
-    desc: 'Manage students, attendance corrections and records',
-    badge: 'Data Entry Operator'
-  }
+  { id: 'student',  title: 'Student',   icon: '👨‍🎓', desc: 'Access attendance, OD, leave and personal requests', badge: 'Student Portal' },
+  { id: 'hod',      title: 'HOD',        icon: '👨‍💼', desc: 'Manage department students, attendance and approvals', badge: 'Department Head' },
+  { id: 'advisor',  title: 'Advisor',    icon: '👨‍🏫', desc: 'Manage assigned students and requests', badge: 'Class Advisor' },
+  { id: 'faculty',  title: 'Faculty',    icon: '👩‍🏫', desc: 'Manage classes, attendance and approved requests', badge: 'Faculty Member' },
+  { id: 'staff',    title: 'Staff',      icon: '👨‍💻', desc: 'View approved OD and leave information', badge: 'Office Staff' },
+  { id: 'deo',      title: 'DEO',        icon: '🧑‍💼', desc: 'Manage students, attendance corrections and records', badge: 'Data Entry Operator' },
 ];
 
 export default function AuthFlowPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  
-  // Step 1: Landing, Step 2: Role Selection, Step 3: Login
+
+  // Step 1: Role Selection, Step 2: Login
   const [step, setStep] = useState(1);
   const [selectedRole, setSelectedRole] = useState(null);
-  
+
   // Login State
-  const [activeTab, setActiveTab] = useState('login'); // 'login' or 'register'
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
@@ -67,6 +30,7 @@ export default function AuthFlowPage() {
   const [loading, setLoading] = useState(false);
 
   // Register state (for Student)
+  const [activeTab, setActiveTab] = useState('login');
   const [regData, setRegData] = useState({
     roll_number: '',
     register_no: '',
@@ -87,30 +51,28 @@ export default function AuthFlowPage() {
     setLoginId('');
     setPassword('');
     setLoginError('');
-    setStep(3);
+    setActiveTab('login');
+    setStep(2);
   };
 
   const handleBack = () => {
-    if (step === 3) {
-      setStep(2);
-    } else if (step === 2) {
-      setStep(1);
-    }
+    setStep(1);
+    setSelectedRole(null);
+    setLoginError('');
   };
 
   const validateLogin = () => {
     if (!loginId.trim()) {
-      setLoginError("Login ID is required. Enter your ID or College Email.");
+      setLoginError('Login ID is required. Enter your ID or College Email.');
       return false;
     }
     if (!password) {
-      setLoginError("Password is required.");
+      setLoginError('Password is required.');
       return false;
     }
-    // For non-student roles, only email is accepted
     if (selectedRole && selectedRole.id !== 'student') {
       if (!loginId.includes('@')) {
-        setLoginError("Please enter a valid institutional email address.");
+        setLoginError('Please enter a valid institutional email address.');
         return false;
       }
     }
@@ -127,16 +89,13 @@ export default function AuthFlowPage() {
     try {
       const user = await login(loginId, password, selectedRole?.id || null);
       toast.success(`Welcome back, ${user.full_name || 'User'}!`);
-      const dashboardPath = getRoleDashboardPath(user.role);
-      navigate(dashboardPath, { replace: true });
+      navigate(getRoleDashboardPath(user.role), { replace: true });
     } catch (err) {
       let detail = err.response?.data?.detail;
       if (!detail) {
-        if (err.message === 'Network Error' || !err.response) {
-          detail = "Unable to connect to the server. Please try again.";
-        } else {
-          detail = "Invalid email or password.";
-        }
+        detail = err.message === 'Network Error' || !err.response
+          ? 'Unable to connect to the server. Please try again.'
+          : 'Invalid email or password.';
       }
       setLoginError(detail);
     } finally {
@@ -149,62 +108,58 @@ export default function AuthFlowPage() {
     const validateField = (name, value) => {
       switch (name) {
         case 'roll_number':
-          if (!value) return "Roll Number is required.";
-          if (value.length !== 8) return "Roll Number must contain exactly 8 characters.";
-          if (!/^[0-9]{2}AIM[0-9]{3}$/.test(value)) return "Use uppercase AIM. Example: 24AIM040.";
-          return "";
+          if (!value) return 'Roll Number is required.';
+          if (value.length !== 8) return 'Roll Number must contain exactly 8 characters.';
+          if (!/^[0-9]{2}AIM[0-9]{3}$/.test(value)) return 'Use uppercase AIM. Example: 24AIM040.';
+          return '';
         case 'register_no':
-          if (!value) return "Register Number is required.";
-          if (/[a-zA-Z\s-]/.test(value)) return "Register Number can contain numbers only.";
-          if (value.length !== 12 || !/^[0-9]{12}$/.test(value)) return "Register Number must contain 12 digits.";
-          return "";
+          if (!value) return 'Register Number is required.';
+          if (/[a-zA-Z\s-]/.test(value)) return 'Register Number can contain numbers only.';
+          if (value.length !== 12 || !/^[0-9]{12}$/.test(value)) return 'Register Number must contain 12 digits.';
+          return '';
         case 'name':
-          if (!value.trim()) return "Full Name is required.";
-          return "";
+          if (!value.trim()) return 'Full Name is required.';
+          return '';
         case 'date_of_birth':
-          if (!value) return "Date of Birth is required.";
-          return "";
+          if (!value) return 'Date of Birth is required.';
+          return '';
         case 'email':
-          if (!value.trim()) return "College Email is required.";
-          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return "Enter a valid email.";
-          return "";
+          if (!value.trim()) return 'College Email is required.';
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Enter a valid email.';
+          return '';
         case 'phone':
-          if (!value) return "Mobile Number is required.";
-          if (value.length !== 10) return "Mobile Number must contain 10 digits.";
-          return "";
+          if (!value) return 'Mobile Number is required.';
+          if (value.length !== 10) return 'Mobile Number must contain 10 digits.';
+          return '';
         case 'password':
-          if (!value) return "Password is required.";
-          if (value.length < 8) return "Must be at least 8 characters.";
-          return "";
+          if (!value) return 'Password is required.';
+          if (value.length < 8) return 'Must be at least 8 characters.';
+          return '';
         case 'confirm_password':
-          if (value !== regData.password) return "Passwords do not match.";
-          return "";
-        default: return "";
+          if (value !== regData.password) return 'Passwords do not match.';
+          return '';
+        default: return '';
       }
     };
 
     if (field) {
       errs[field] = validateField(field, regData[field]);
     } else {
-      Object.keys(regData).forEach(key => {
-        errs[key] = validateField(key, regData[key]);
-      });
+      Object.keys(regData).forEach(key => { errs[key] = validateField(key, regData[key]); });
     }
-
     setErrors(errs);
-    return Object.values(errs).every(x => x === "");
+    return Object.values(errs).every(x => x === '');
   };
 
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     if (!validateRegister()) return;
-
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(regData)
+        body: JSON.stringify(regData),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -227,287 +182,424 @@ export default function AuthFlowPage() {
     if (errors[field]) setErrors(prev => ({ ...prev, [field]: '' }));
   };
 
-  return (
-    <div className="login-page" style={{ minHeight: '100vh', position: 'relative' }}>
-      <div className="login-bg" />
-
-      {/* Top Header with Back Navigation & Step Indicator */}
-      {step > 1 && (
+  // STEP 1 — ROLE SELECTION
+  if (step === 1) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'var(--bg-body)',
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
+        {/* Header */}
         <div style={{
-          position: 'absolute', top: 20, left: 24, right: 24,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          zIndex: 10
-        }}>
-          <button
-            onClick={handleBack}
-            style={{
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              color: '#e2e8f0',
-              padding: '8px 16px',
-              borderRadius: '20px',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: 14,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              backdropFilter: 'blur(10px)',
-              transition: 'var(--transition)'
-            }}
-          >
-            ← Back
-          </button>
-
-          {/* Step Indicator */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: 'rgba(15,23,42,0.8)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            padding: '6px 16px',
-            borderRadius: '20px',
-            fontSize: 13,
-            color: 'var(--gray-400)',
-            backdropFilter: 'blur(10px)'
-          }}>
-            <span style={{ color: step >= 1 ? 'var(--primary-400)' : 'inherit', fontWeight: step === 1 ? 700 : 400 }}>
-              {step > 1 ? '① ✓' : '① Welcome'}
-            </span>
-            <span>→</span>
-            <span style={{ color: step >= 2 ? 'var(--primary-400)' : 'inherit', fontWeight: step === 2 ? 700 : 400 }}>
-              {step > 2 ? '② ✓' : '② Select Role'}
-            </span>
-            <span>→</span>
-            <span style={{ color: step >= 3 ? 'var(--primary-400)' : 'inherit', fontWeight: step === 3 ? 700 : 400 }}>
-              ③ Login
-            </span>
-            <span>→</span>
-            <span style={{ color: step >= 4 ? 'var(--primary-400)' : 'inherit' }}>
-              ④ Dashboard
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 1: LANDING PAGE */}
-      {step === 1 && (
-        <div style={{
-          minHeight: '100vh', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', padding: '40px 20px',
-          maxWidth: 900, margin: '0 auto', textAlign: 'center', zIndex: 2, position: 'relative'
+          background: 'var(--primary-600)',
+          padding: '20px 40px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
         }}>
           <div style={{
-            width: 90, height: 90, borderRadius: 24,
-            background: 'var(--gradient-brand)',
+            width: 40, height: 40,
+            background: 'rgba(255,255,255,0.15)',
+            borderRadius: 8,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 44, margin: '0 auto 24px',
-            boxShadow: 'var(--shadow-glow)'
+            fontSize: 20,
           }}>🎓</div>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: 'white' }}>KI Smart Attendance+</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Kangeyam Institute of Technology</div>
+          </div>
+        </div>
 
-          <h1 style={{ fontSize: 48, fontWeight: 800, lineHeight: 1.2, marginBottom: 12 }}>
-            <span style={{ background: 'var(--gradient-brand)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              KI Smart
-            </span>
-            <br />
-            <span style={{ color: '#e2e8f0' }}>Attendance+</span>
-          </h1>
-          <p style={{ fontSize: 20, color: 'var(--gray-400)', marginBottom: 48, maxWidth: 600 }}>
-            Smart Attendance, Smarter Student Management
-          </p>
-
-          <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-            gap: 20, width: '100%', marginBottom: 48, textAlign: 'left'
-          }}>
-            {[
-              { icon: '📊', title: 'Smart Attendance Planner', desc: 'Calculate classes needed to reach 75%' },
-              { icon: '🎯', title: 'OD & Leave Management', desc: 'Full workflow with proof verification' },
-              { icon: '🔔', title: 'Real-time Notifications', desc: 'Instant alerts for all stakeholders' },
-              { icon: '🔐', title: 'Role-Based Access', desc: 'Student, Faculty, Advisor, HOD, DEO, Staff' },
-            ].map((f, i) => (
-              <div key={i} style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 16, padding: '20px',
-                backdropFilter: 'blur(10px)',
-                transition: 'transform 0.2s ease',
-              }}>
-                <div style={{ fontSize: 32, marginBottom: 12 }}>{f.icon}</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>{f.title}</div>
-                <div style={{ fontSize: 13, color: 'var(--gray-500)', lineHeight: 1.5 }}>{f.desc}</div>
-              </div>
-            ))}
+        {/* Main content */}
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '48px 24px',
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: 40 }}>
+            <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
+              Welcome to KI Smart Attendance+
+            </h1>
+            <p style={{ fontSize: 15, color: 'var(--text-secondary)' }}>
+              Please select your role to continue to the portal
+            </p>
           </div>
 
-          <button
-            onClick={() => setStep(2)}
-            style={{
-              background: 'var(--gradient-brand)',
-              color: 'white', border: 'none',
-              padding: '16px 48px', borderRadius: 30,
-              fontSize: 18, fontWeight: 700,
-              cursor: 'pointer', boxShadow: 'var(--shadow-glow)',
-              display: 'flex', alignItems: 'center', gap: 12,
-              transition: 'transform 0.2s ease'
-            }}
-          >
-            NEXT →
-          </button>
-        </div>
-      )}
-
-      {/* STEP 2: ROLE SELECTION PAGE */}
-      {step === 2 && (
-        <div style={{
-          minHeight: '100vh', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', padding: '80px 20px 40px',
-          maxWidth: 1000, margin: '0 auto', textAlign: 'center', zIndex: 2, position: 'relative'
-        }}>
-          <h1 style={{ fontSize: 36, fontWeight: 800, color: '#e2e8f0', marginBottom: 8 }}>
-            Welcome to KI Smart Attendance+
-          </h1>
-          <p style={{ fontSize: 16, color: 'var(--gray-400)', marginBottom: 40 }}>
-            Select your role to continue
-          </p>
-
           <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: 20, width: '100%'
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: 16,
+            width: '100%',
+            maxWidth: 900,
           }}>
             {ROLES.map((r) => (
-              <div
+              <button
                 key={r.id}
                 onClick={() => handleRoleSelect(r)}
                 style={{
-                  background: 'rgba(30, 41, 59, 0.7)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: 20, padding: 24,
-                  textAlign: 'left', cursor: 'pointer',
-                  backdropFilter: 'blur(12px)',
-                  transition: 'all 0.2s ease',
-                  position: 'relative',
-                  display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--border-radius-lg)',
+                  padding: 20,
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                  fontFamily: 'inherit',
                 }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--primary-400)';
-                  e.currentTarget.style.transform = 'translateY(-4px)';
+                onMouseOver={e => {
+                  e.currentTarget.style.borderColor = 'var(--secondary)';
+                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(0,82,204,0.1)';
                 }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                  e.currentTarget.style.transform = 'translateY(0)';
+                onMouseOut={e => {
+                  e.currentTarget.style.borderColor = 'var(--border)';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
               >
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                    <span style={{ fontSize: 36 }}>{r.icon}</span>
-                    <span style={{
-                      fontSize: 11, fontWeight: 600, padding: '4px 10px',
-                      borderRadius: 12, background: 'rgba(99,102,241,0.15)',
-                      color: 'var(--primary-400)', border: '1px solid rgba(99,102,241,0.3)'
-                    }}>
-                      {r.badge}
-                    </span>
-                  </div>
-                  <h3 style={{ fontSize: 20, fontWeight: 700, color: '#e2e8f0', marginBottom: 8 }}>
-                    Login as {r.title}
-                  </h3>
-                  <p style={{ fontSize: 13, color: 'var(--gray-400)', lineHeight: 1.5, marginBottom: 20 }}>
-                    {r.desc}
-                  </p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 28 }}>{r.icon}</span>
+                  <span style={{
+                    fontSize: 11, fontWeight: 600, padding: '3px 8px',
+                    borderRadius: 4, background: 'var(--info-bg)',
+                    color: 'var(--info)', border: '1px solid #bce4fa',
+                  }}>
+                    {r.badge}
+                  </span>
                 </div>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  color: 'var(--primary-400)', fontWeight: 600, fontSize: 14
-                }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {r.title}
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  {r.desc}
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--secondary)', fontWeight: 600, marginTop: 4 }}>
                   Proceed to Login →
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
-      )}
 
-      {/* STEP 3: ROLE LOGIN PAGE */}
-      {step === 3 && selectedRole && (
-        <div className="login-right" style={{
-          minHeight: '100vh', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', padding: '80px 20px 40px', width: '100%'
+        {/* Footer */}
+        <div style={{
+          background: 'var(--bg-surface)',
+          borderTop: '1px solid var(--border)',
+          padding: '12px 40px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
         }}>
-          <div className="login-card" style={{ width: '100%', maxWidth: '460px', padding: '36px 40px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-              <span style={{ fontSize: 32 }}>{selectedRole.icon}</span>
-              <div>
-                <h1 className="login-logo" style={{ fontSize: 24, margin: 0 }}>
-                  {selectedRole.title} Login
-                </h1>
-                <p style={{ fontSize: 13, color: 'var(--gray-500)', margin: 0 }}>
-                  Sign in to your {selectedRole.title.toLowerCase()} account
-                </p>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            © 2024 Kangeyam Institute of Technology. All rights reserved.
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            KI Smart Attendance+ v2.0
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // STEP 2 — LOGIN / REGISTER
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--bg-body)', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div style={{
+        background: 'var(--primary-600)', padding: '16px 40px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{
+            width: 36, height: 36, background: 'rgba(255,255,255,0.15)',
+            borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+          }}>🎓</div>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'white' }}>KI Smart Attendance+</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>Kangeyam Institute of Technology</div>
+          </div>
+        </div>
+        <button
+          onClick={handleBack}
+          style={{
+            background: 'rgba(255,255,255,0.1)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            color: 'white', padding: '6px 14px',
+            borderRadius: 4, cursor: 'pointer',
+            fontSize: 13, fontFamily: 'inherit', fontWeight: 500,
+          }}
+        >
+          ← Back to Role Selection
+        </button>
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
+        <div className="login-card">
+          {/* Role Badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+            <span style={{ fontSize: 28 }}>{selectedRole?.icon}</span>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
+                {selectedRole?.title} Login
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                KI Smart Attendance+ — {selectedRole?.badge}
               </div>
             </div>
+          </div>
 
+          {/* Tabs — only show for student who can also register */}
+          {selectedRole?.id === 'student' && (
+            <div className="tabs" style={{ marginBottom: 20 }}>
+              <button
+                className={`tab${activeTab === 'login' ? ' active' : ''}`}
+                onClick={() => setActiveTab('login')}
+              >
+                Sign In
+              </button>
+              <button
+                className={`tab${activeTab === 'register' ? ' active' : ''}`}
+                onClick={() => setActiveTab('register')}
+              >
+                New Registration
+              </button>
+            </div>
+          )}
+
+          {/* LOGIN FORM */}
+          {activeTab === 'login' && (
             <form onSubmit={handleLoginSubmit}>
-              <div className="form-group mb-4">
+              <div className="form-group">
                 <label className="form-label">
-                  {selectedRole.id === 'student' ? 'College Email / Register Number' : 'Email ID'}
+                  {selectedRole?.id === 'student' ? 'College Email / Register Number / Roll Number' : 'Institutional Email'}
                 </label>
                 <input
-                  type={selectedRole.id === 'student' ? 'text' : 'email'}
+                  type={selectedRole?.id === 'student' ? 'text' : 'email'}
                   className="form-input"
-                  placeholder={selectedRole.id === 'student' ? 'e.g. student@kitech.edu.in or 7376241AI101' : `e.g. ${selectedRole.id}.aiml@kitech.edu.in`}
+                  placeholder={
+                    selectedRole?.id === 'student'
+                      ? 'e.g. student@kitech.edu.in or 737624...'
+                      : `e.g. ${selectedRole?.id}.aiml@kitech.edu.in`
+                  }
                   value={loginId}
-                  onChange={(e) => { setLoginId(e.target.value); setLoginError(''); }}
+                  onChange={e => { setLoginId(e.target.value); setLoginError(''); }}
                   autoComplete="username"
+                  autoFocus
                 />
               </div>
 
-                <div className="form-group mb-2">
-                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    Password
-                    <a href="#" style={{ color: 'var(--primary-400)', fontSize: 12, textDecoration: 'none' }}>Forgot Password?</a>
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type={showPwd ? 'text' : 'password'}
-                      className="form-input"
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => { setPassword(e.target.value); setLoginError(''); }}
-                      autoComplete="current-password"
-                      style={{ paddingRight: 44 }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPwd(!showPwd)}
-                      style={{
-                        position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        color: 'var(--gray-500)', fontSize: 16
-                      }}
-                    >
-                      {showPwd ? '🙈' : '👁️'}
-                    </button>
-                  </div>
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  Password
+                  <a href="#" style={{ color: 'var(--secondary)', fontSize: 12, textDecoration: 'none', fontWeight: 400 }}>
+                    Forgot Password?
+                  </a>
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPwd ? 'text' : 'password'}
+                    className="form-input"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={e => { setPassword(e.target.value); setLoginError(''); }}
+                    autoComplete="current-password"
+                    style={{ paddingRight: 44 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPwd(!showPwd)}
+                    style={{
+                      position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: 'var(--text-muted)', fontSize: 16,
+                    }}
+                  >
+                    {showPwd ? '🙈' : '👁️'}
+                  </button>
                 </div>
+              </div>
 
-                {loginError && (
-                  <div style={{ color: '#ef4444', fontSize: 13, margin: '12px 0' }}>
-                    {loginError}
-                  </div>
-                )}
+              {loginError && (
+                <div className="alert alert-danger" style={{ marginBottom: 16, fontSize: 13 }}>
+                  {loginError}
+                </div>
+              )}
 
+              <button
+                type="submit"
+                className="btn btn-primary w-full"
+                disabled={loading}
+                style={{ height: 42, marginTop: 4 }}
+              >
+                {loading ? <span className="spinner" /> : `Sign In as ${selectedRole?.title}`}
+              </button>
+            </form>
+          )}
+
+          {/* REGISTER FORM */}
+          {activeTab === 'register' && selectedRole?.id === 'student' && (
+            <form onSubmit={handleRegisterSubmit}>
+              <div className="grid-2" style={{ gap: 12 }}>
+                <div className="form-group">
+                  <label className="form-label">Roll Number <span className="text-danger">*</span></label>
+                  <input
+                    className={`form-input${errors.roll_number ? ' border-danger' : ''}`}
+                    value={regData.roll_number}
+                    onChange={e => handleInputChange('roll_number', e.target.value.toUpperCase())}
+                    placeholder="e.g. 24AIM040"
+                    maxLength={8}
+                  />
+                  {errors.roll_number && <div className="form-error">{errors.roll_number}</div>}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Register Number <span className="text-danger">*</span></label>
+                  <input
+                    className={`form-input${errors.register_no ? ' border-danger' : ''}`}
+                    value={regData.register_no}
+                    onChange={e => handleInputChange('register_no', e.target.value.replace(/\D/g, ''))}
+                    placeholder="12-digit number"
+                    maxLength={12}
+                  />
+                  {errors.register_no && <div className="form-error">{errors.register_no}</div>}
+                </div>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label">Full Name <span className="text-danger">*</span></label>
+                  <input
+                    className={`form-input${errors.name ? ' border-danger' : ''}`}
+                    value={regData.name}
+                    onChange={e => handleInputChange('name', e.target.value)}
+                    placeholder="As per documents"
+                  />
+                  {errors.name && <div className="form-error">{errors.name}</div>}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Date of Birth <span className="text-danger">*</span></label>
+                  <input
+                    type="date"
+                    className={`form-input${errors.date_of_birth ? ' border-danger' : ''}`}
+                    value={regData.date_of_birth}
+                    onChange={e => handleInputChange('date_of_birth', e.target.value)}
+                  />
+                  {errors.date_of_birth && <div className="form-error">{errors.date_of_birth}</div>}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Department</label>
+                  <select className="form-input" value={regData.department} onChange={e => handleInputChange('department', e.target.value)}>
+                    <option value="CSE(AI&ML)">CSE (AI&ML)</option>
+                    <option value="CSE">CSE</option>
+                    <option value="ECE">ECE</option>
+                    <option value="EEE">EEE</option>
+                    <option value="MECH">Mechanical</option>
+                    <option value="CIVIL">Civil</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Year</label>
+                  <select className="form-input" value={regData.year} onChange={e => handleInputChange('year', e.target.value)}>
+                    <option value="I">I Year</option>
+                    <option value="II">II Year</option>
+                    <option value="III">III Year</option>
+                    <option value="IV">IV Year</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Section</label>
+                  <input
+                    className="form-input"
+                    value={regData.section}
+                    onChange={e => handleInputChange('section', e.target.value.toUpperCase())}
+                    placeholder="e.g. AIML or A"
+                  />
+                </div>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label">College Email <span className="text-danger">*</span></label>
+                  <input
+                    type="email"
+                    className={`form-input${errors.email ? ' border-danger' : ''}`}
+                    value={regData.email}
+                    onChange={e => handleInputChange('email', e.target.value)}
+                    placeholder="e.g. student@kitech.edu.in"
+                  />
+                  {errors.email && <div className="form-error">{errors.email}</div>}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Mobile Number <span className="text-danger">*</span></label>
+                  <input
+                    className={`form-input${errors.phone ? ' border-danger' : ''}`}
+                    value={regData.phone}
+                    onChange={e => handleInputChange('phone', e.target.value.replace(/\D/g, ''))}
+                    placeholder="10-digit number"
+                    maxLength={10}
+                  />
+                  {errors.phone && <div className="form-error">{errors.phone}</div>}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Password <span className="text-danger">*</span></label>
+                  <input
+                    type="password"
+                    className={`form-input${errors.password ? ' border-danger' : ''}`}
+                    value={regData.password}
+                    onChange={e => handleInputChange('password', e.target.value)}
+                    placeholder="Min. 8 characters"
+                  />
+                  {errors.password && <div className="form-error">{errors.password}</div>}
+                </div>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label">Confirm Password <span className="text-danger">*</span></label>
+                  <input
+                    type="password"
+                    className={`form-input${errors.confirm_password ? ' border-danger' : ''}`}
+                    value={regData.confirm_password}
+                    onChange={e => handleInputChange('confirm_password', e.target.value)}
+                    placeholder="Re-enter password"
+                  />
+                  {errors.confirm_password && <div className="form-error">{errors.confirm_password}</div>}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-primary w-full"
+                disabled={loading}
+                style={{ height: 42, marginTop: 4 }}
+              >
+                {loading ? <span className="spinner" /> : 'Create Student Account'}
+              </button>
+
+              <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+                Already registered?{' '}
                 <button
-                  type="submit"
-                  className="btn btn-primary w-full"
-                  disabled={loading}
-                  style={{ marginTop: 16, height: 46 }}
+                  type="button"
+                  onClick={() => setActiveTab('login')}
+                  style={{ background: 'none', border: 'none', color: 'var(--secondary)', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}
                 >
-                  {loading ? <span className="spinner" /> : 'Sign In as ' + selectedRole.title}
+                  Sign in instead
                 </button>
-              </form>
+              </div>
+            </form>
+          )}
+
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-light)', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+            Kangeyam Institute of Technology — KI Smart Attendance+ Portal
           </div>
         </div>
-      )}
+      </div>
+
+      {/* Footer */}
+      <div style={{
+        background: 'var(--bg-surface)', borderTop: '1px solid var(--border)',
+        padding: '12px 40px', fontSize: 12, color: 'var(--text-muted)',
+        textAlign: 'center',
+      }}>
+        © 2024 Kangeyam Institute of Technology. All rights reserved.
+      </div>
     </div>
   );
 }

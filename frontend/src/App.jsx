@@ -152,16 +152,16 @@ function ProtectedRoute({ children, allowedRoles }) {
     return (
       <div style={{
         minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--surface-dark)', flexDirection: 'column', gap: 16
+        background: 'var(--bg-body)', flexDirection: 'column', gap: 16
       }}>
         <div style={{
-          width: 60, height: 60, borderRadius: 15,
-          background: 'var(--gradient-brand)',
+          width: 56, height: 56, borderRadius: 10,
+          background: 'var(--primary-600)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 28, boxShadow: 'var(--shadow-glow)'
+          fontSize: 26,
         }}>🎓</div>
-        <div className="spinner" style={{ width: 30, height: 30, borderWidth: 3 }} />
-        <div style={{ color: 'var(--gray-500)', fontSize: 14 }}>Loading KI Smart Attendance+...</div>
+        <div className="spinner spinner-dark" style={{ width: 28, height: 28, borderWidth: 3 }} />
+        <div style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Loading KI Smart Attendance+...</div>
       </div>
     );
   }
@@ -200,15 +200,15 @@ function App() {
             position="top-right"
             toastOptions={{
               style: {
-                background: 'var(--surface-dark-2)',
-                color: '#e2e8f0',
-                border: '1px solid var(--border-dark)',
-                borderRadius: '12px',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border)',
+                borderRadius: '6px',
                 fontSize: '14px',
                 boxShadow: 'var(--shadow-lg)',
               },
-              success: { iconTheme: { primary: '#10b981', secondary: 'white' } },
-              error: { iconTheme: { primary: '#ef4444', secondary: 'white' } },
+              success: { iconTheme: { primary: 'var(--success)', secondary: 'white' } },
+              error: { iconTheme: { primary: 'var(--danger)', secondary: 'white' } },
             }}
           />
         </BrowserRouter>

@@ -83,8 +83,8 @@ export function StudentsListPage() {
     <div className="page-content animate-fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, color: '#e2e8f0' }}>👥 Students</h2>
-          <p style={{ color: 'var(--gray-500)', fontSize: 14 }}>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)' }}>👥 Students</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
             {data?.total || 0} students registered
           </p>
         </div>
@@ -96,9 +96,9 @@ export function StudentsListPage() {
       </div>
 
       {showAddStudent && user?.role === 'deo' && (
-        <div className="card mb-6" style={{ borderColor: 'rgba(99,102,241,0.4)', background: 'var(--surface-dark-2)' }}>
+        <div className="card mb-6" style={{ borderColor: 'rgba(99,102,241,0.4)', background: 'var(--bg-surface)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#e2e8f0' }}>
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
               👤 Create Complete Student Account
             </h3>
             <div style={{ background: 'rgba(16,185,129,0.15)', color: 'var(--success)', padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
@@ -261,14 +261,14 @@ export function StudentsListPage() {
                 <tbody>
                   {data?.students?.map((s, idx) => (
                     <tr key={s.id || s.register_no}>
-                      <td style={{ color: 'var(--gray-600)', fontSize: 12 }}>{(page - 1) * 20 + idx + 1}</td>
-                      <td style={{ fontWeight: 600, color: '#e2e8f0' }}>{s.name}</td>
-                      <td style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--gray-400)' }}>{s.register_no}</td>
-                      <td style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--gray-400)' }}>{s.roll_number || '-'}</td>
+                      <td style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{(page - 1) * 20 + idx + 1}</td>
+                      <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{s.name}</td>
+                      <td style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{s.register_no}</td>
+                      <td style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{s.roll_number || '-'}</td>
                       <td style={{ fontSize: 12 }}>{s.department}</td>
                       <td>{s.year}</td>
                       <td>{s.section}</td>
-                      <td style={{ fontSize: 12, color: 'var(--gray-500)' }}>{s.email}</td>
+                      <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{s.email}</td>
                       <td>
                         <span className={`badge badge-${s.status === 'ACTIVE' ? 'approved' : 'rejected'}`}>
                           {s.status || 'ACTIVE'}
@@ -290,7 +290,7 @@ export function StudentsListPage() {
                   ))}
                   {!data?.students?.length && (
                     <tr>
-                      <td colSpan={10} style={{ textAlign: 'center', color: 'var(--gray-600)', padding: 40 }}>
+                      <td colSpan={10} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: 40 }}>
                         No students found
                       </td>
                     </tr>
@@ -303,7 +303,7 @@ export function StudentsListPage() {
           {totalPages > 1 && (
             <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 16 }}>
               <button className="btn btn-secondary" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Prev</button>
-              <span style={{ padding: '8px 16px', color: 'var(--gray-400)', fontSize: 13 }}>Page {page} of {totalPages}</span>
+              <span style={{ padding: '8px 16px', color: 'var(--text-secondary)', fontSize: 13 }}>Page {page} of {totalPages}</span>
               <button className="btn btn-secondary" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>Next</button>
             </div>
           )}
@@ -369,8 +369,8 @@ export function FacultyListPage() {
     <div className="page-content animate-fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, color: '#e2e8f0' }}>👨‍🏫 Faculty & Staff</h2>
-          <p style={{ color: 'var(--gray-500)', fontSize: 14 }}>{data?.total || 0} institutional users</p>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)' }}>👨‍🏫 Faculty & Staff</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>{data?.total || 0} institutional users</p>
         </div>
         {user?.role === 'deo' && (
           <button className="btn btn-primary" onClick={() => setShowCreateForm(!showCreateForm)}>
@@ -381,7 +381,7 @@ export function FacultyListPage() {
 
       {showCreateForm && user?.role === 'deo' && (
         <div className="card mb-6" style={{ borderColor: 'rgba(99,102,241,0.3)' }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginBottom: 20 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 20 }}>
             🔐 Create Institutional User Account
           </h3>
           <div style={{ padding: '12px 16px', background: 'rgba(245,158,11,0.08)', borderRadius: 8, marginBottom: 20, fontSize: 13, color: 'var(--warning)' }}>
@@ -508,8 +508,8 @@ export function FacultyListPage() {
               <tbody>
                 {data?.staff?.map((s, idx) => (
                   <tr key={s.id}>
-                    <td style={{ color: 'var(--gray-600)', fontSize: 12 }}>{idx + 1}</td>
-                    <td style={{ fontWeight: 600, color: '#e2e8f0' }}>{s.name}</td>
+                    <td style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{idx + 1}</td>
+                    <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{s.name}</td>
                     <td>
                       <span style={{
                         fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 8,
@@ -519,9 +519,9 @@ export function FacultyListPage() {
                       }}>{s.role}</span>
                     </td>
                     <td style={{ fontSize: 12 }}>{s.department}</td>
-                    <td style={{ fontSize: 12, color: 'var(--gray-400)' }}>{s.designation || '-'}</td>
-                    <td style={{ fontSize: 12, color: 'var(--gray-500)' }}>{s.email}</td>
-                    <td style={{ fontSize: 12, color: 'var(--gray-400)' }}>
+                    <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{s.designation || '-'}</td>
+                    <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{s.email}</td>
+                    <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                       {s.assigned_year || s.assigned_section
                         ? `${s.assigned_year || ''} ${s.assigned_section || ''}`.trim()
                         : '-'}
@@ -535,7 +535,7 @@ export function FacultyListPage() {
                 ))}
                 {!data?.staff?.length && (
                   <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', color: 'var(--gray-600)', padding: 40 }}>
+                    <td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: 40 }}>
                       No staff accounts found.
                       {user?.role === 'deo' && ' Click "Create Account" to add institutional users.'}
                     </td>
@@ -589,8 +589,8 @@ export function NotificationsPage() {
     <div className="page-content animate-fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, color: '#e2e8f0' }}>🔔 Notifications</h2>
-          <p style={{ color: 'var(--gray-500)', fontSize: 14 }}>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)' }}>🔔 Notifications</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
             {data?.unread_count > 0 ? `${data.unread_count} unread notification(s)` : 'All caught up!'}
           </p>
         </div>
@@ -615,8 +615,8 @@ export function NotificationsPage() {
                 <div style={{ fontWeight: n.is_read ? 500 : 700, color: n.is_read ? 'var(--gray-400)' : '#e2e8f0', fontSize: 14 }}>
                   {n.title || n.message}
                 </div>
-                {n.body && <div style={{ fontSize: 13, color: 'var(--gray-500)', marginTop: 4 }}>{n.body}</div>}
-                <div style={{ fontSize: 11, color: 'var(--gray-600)', marginTop: 6 }}>
+                {n.body && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>{n.body}</div>}
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 6 }}>
                   {n.created_at && new Date(n.created_at).toLocaleString('en-IN')}
                 </div>
               </div>
@@ -628,8 +628,8 @@ export function NotificationsPage() {
           {!data?.notifications?.length && (
             <div className="card" style={{ textAlign: 'center', padding: 60 }}>
               <div style={{ fontSize: 48, marginBottom: 16 }}>🔔</div>
-              <div style={{ color: 'var(--gray-500)', fontSize: 15 }}>No notifications yet</div>
-              <div style={{ color: 'var(--gray-600)', fontSize: 13, marginTop: 8 }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: 15 }}>No notifications yet</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 8 }}>
                 You'll receive updates about your requests and attendance here.
               </div>
             </div>
@@ -662,8 +662,8 @@ export function TimetablePage() {
   return (
     <div className="page-content animate-fade-in">
       <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 800, color: '#e2e8f0' }}>📅 Timetable</h2>
-        <p style={{ color: 'var(--gray-500)', fontSize: 14 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)' }}>📅 Timetable</h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
           {user?.role === 'student'
             ? `${user?.department || ''} ${user?.year || ''} Year — ${user?.section || ''}`
             : 'Weekly class schedule'}
@@ -694,7 +694,7 @@ export function TimetablePage() {
         <div style={{ textAlign: 'center', padding: 60 }}><span className="spinner" /></div>
       ) : (
         <div className="card">
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginBottom: 16 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 16 }}>
             {daysFull[activeDay - 1]} Schedule
           </h3>
           {activeDay === currentTodayDow && todayPeriods.length > 0 ? (
@@ -702,28 +702,28 @@ export function TimetablePage() {
               {todayPeriods.map((p, idx) => (
                 <div key={idx} style={{
                   display: 'flex', alignItems: 'center', gap: 16,
-                  background: 'var(--surface-dark-3)', borderRadius: 10, padding: '14px 18px',
+                  background: 'var(--bg-body)', borderRadius: 10, padding: '14px 18px',
                   borderLeft: '3px solid var(--primary-400)'
                 }}>
                   <div style={{
                     width: 32, height: 32, borderRadius: 8,
                     background: 'rgba(99,102,241,0.15)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontWeight: 700, color: 'var(--primary-400)', fontSize: 14, flexShrink: 0
+                    fontWeight: 700, color: 'var(--secondary)', fontSize: 14, flexShrink: 0
                   }}>
                     {p.period_number || idx + 1}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, color: '#e2e8f0', fontSize: 14 }}>{p.subject_name || 'Subject'}</div>
-                    <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 2 }}>
+                    <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 14 }}>{p.subject_name || 'Subject'}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                       {p.subject_code && <span style={{ fontFamily: 'monospace' }}>{p.subject_code} • </span>}
                       {p.faculty_name && <span>{p.faculty_name}</span>}
                       {p.room && <span> • Room {p.room}</span>}
                     </div>
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--gray-400)', textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right', flexShrink: 0 }}>
                     <div>{p.start_time}</div>
-                    <div style={{ color: 'var(--gray-600)', fontSize: 10 }}>to</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 10 }}>to</div>
                     <div>{p.end_time}</div>
                   </div>
                 </div>
@@ -737,7 +737,7 @@ export function TimetablePage() {
                   ? 'No classes scheduled for today'
                   : `Select today's tab to view live schedule`}
               </div>
-              <div style={{ fontSize: 12, color: 'var(--gray-600)', marginTop: 8 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 8 }}>
                 Contact your class advisor or DEO if the timetable seems incorrect.
               </div>
             </div>
@@ -788,8 +788,8 @@ export function ClassesPage() {
     <div className="page-content animate-fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, color: '#e2e8f0' }}>🏛️ Classes & Sections</h2>
-          <p style={{ color: 'var(--gray-500)', fontSize: 14 }}>Manage academic sections and class configuration</p>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)' }}>🏛️ Classes & Sections</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Manage academic sections and class configuration</p>
         </div>
         {['deo', 'hod'].includes(user?.role) && (
           <button className="btn btn-primary" onClick={() => setShowAddForm(!showAddForm)}>
@@ -800,7 +800,7 @@ export function ClassesPage() {
 
       {showAddForm && (
         <div className="card mb-6" style={{ borderColor: 'rgba(99,102,241,0.3)' }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginBottom: 16 }}>Add New Section</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 16 }}>Add New Section</h3>
           <form onSubmit={handleAddSection}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
               <div className="form-group">
@@ -887,7 +887,7 @@ export function ClassesPage() {
                 ))}
                 {!sectionsData?.sections?.length && (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', color: 'var(--gray-600)', padding: 40 }}>
+                    <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: 40 }}>
                       No sections configured yet
                     </td>
                   </tr>
@@ -909,13 +909,14 @@ export function StaffDashboard() {
   return (
     <div className="page-content animate-fade-in">
       <div style={{
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: 'var(--border-radius-xl)', padding: '28px 32px', marginBottom: 24
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border-color)',
+        boxShadow: 'var(--shadow-sm)',
+        borderRadius: 'var(--radius-lg)', padding: '24px 28px', marginBottom: 24
       }}>
-        <div style={{ fontSize: 13, color: 'var(--gray-500)', marginBottom: 4 }}>Welcome back</div>
-        <h2 style={{ fontSize: 24, fontWeight: 800, color: '#e2e8f0', margin: 0 }}>{user?.full_name}</h2>
-        <div style={{ fontSize: 13, color: 'var(--gray-400)', marginTop: 6 }}>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>Welcome back</div>
+        <h2 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{user?.full_name}</h2>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6 }}>
           Office Staff • {user?.department || 'KIT'}
           {user?.office && <span> • {user.office}</span>}
         </div>
@@ -938,10 +939,10 @@ export function StaffDashboard() {
       </div>
 
       <div className="card" style={{ marginTop: 24 }}>
-        <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>ℹ️ Staff Portal</h3>
-        <div style={{ fontSize: 14, color: 'var(--gray-400)', lineHeight: 1.8 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12 }}>ℹ️ Staff Portal</h3>
+        <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
           As office staff, you can view approved OD and leave notifications for processing.<br />
-          <span style={{ color: 'var(--gray-600)', fontSize: 13 }}>
+          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
             For access issues or account changes, contact the DEO.
           </span>
         </div>
@@ -949,3 +950,4 @@ export function StaffDashboard() {
     </div>
   );
 }
+

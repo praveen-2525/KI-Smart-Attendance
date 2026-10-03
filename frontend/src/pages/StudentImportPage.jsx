@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+﻿import { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi, usersApi } from '../services/api';
 import toast from 'react-hot-toast';
@@ -57,14 +57,14 @@ export default function StudentImportPage() {
   return (
     <div className="page-content animate-fade-in">
       <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 800, color: '#e2e8f0' }}>📥 Import Students</h2>
-        <p style={{ color: 'var(--gray-500)', fontSize: 14 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)' }}>📥 Import Students</h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
           Upload student master data via CSV
         </p>
       </div>
 
       <div className="card mb-6">
-        <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginBottom: 16 }}>Upload CSV</h3>
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 16 }}>Upload CSV</h3>
         
         <div style={{
           border: '2px dashed var(--border-dark)',
@@ -80,10 +80,10 @@ export default function StudentImportPage() {
             onChange={handleFileChange}
           />
           <div style={{ fontSize: 32, marginBottom: 12 }}>{file ? '📄' : '📤'}</div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: '#e2e8f0', marginBottom: 8 }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
             {file ? file.name : 'Click to select CSV file'}
           </div>
-          <div style={{ fontSize: 13, color: 'var(--gray-500)' }}>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
             Required columns: register_no, name, date_of_birth, department, year, section, email, phone
           </div>
         </div>
@@ -146,7 +146,7 @@ export default function StudentImportPage() {
 
           {preview.valid_count > 0 && (
             <div className="card mb-6">
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 16 }}>
                 ✅ Preview (First 10 valid rows)
               </h3>
               <div className="table-container">
@@ -169,7 +169,7 @@ export default function StudentImportPage() {
                         <td>{row.data.department}</td>
                         <td>{row.data.year}</td>
                         <td>{row.data.section}</td>
-                        <td style={{ color: 'var(--gray-500)' }}>{row.data.formatted_dob}</td>
+                        <td style={{ color: 'var(--text-muted)' }}>{row.data.formatted_dob}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -194,3 +194,4 @@ export default function StudentImportPage() {
     </div>
   );
 }
+

@@ -115,8 +115,8 @@ export default function Sidebar({ notifCount = 0 }) {
       <div className="sidebar-logo">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: 'var(--gradient-brand)',
+            width: 36, height: 36, borderRadius: 8,
+            background: 'rgba(255,255,255,0.15)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 18, flexShrink: 0
           }}>🎓</div>

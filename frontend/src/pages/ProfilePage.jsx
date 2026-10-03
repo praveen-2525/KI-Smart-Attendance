@@ -49,67 +49,46 @@ export default function ProfilePage() {
   };
 
   return (
-    <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto' }}>
-      <div style={{
-        background: 'var(--surface-dark-2)',
-        border: '1px solid var(--border-dark)',
-        borderRadius: '16px',
-        padding: '32px',
-        boxShadow: 'var(--shadow-lg)'
-      }}>
+    <div className="card">
+      <div className="card-header">
+        <h2 className="card-title">User Profile</h2>
+        {user.role === 'student' && !isEditing && (
+          <button className="btn btn-primary" onClick={() => setIsEditing(true)}>
+            Edit Profile
+          </button>
+        )}
+      </div>
+      <div className="card-body">
+        
         {/* Header avatar & basic info */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px', borderBottom: '1px solid var(--border-dark)', paddingBottom: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-            <div style={{
-              width: 80, height: 80, borderRadius: '50%',
-              background: 'var(--gradient-brand)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 32, fontWeight: 700, color: 'white',
-              boxShadow: 'var(--shadow-glow)'
-            }}>
-              {user.full_name ? user.full_name.split(' ').map(n => n[0]).slice(0, 2).join('') : '?'}
-            </div>
-            <div>
-              <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#e2e8f0', margin: 0 }}>
-                {user.full_name || 'User Profile'}
-              </h1>
-              <div style={{
-                display: 'inline-block',
-                marginTop: '6px',
-                padding: '4px 12px',
-                borderRadius: '20px',
-                background: 'rgba(99,102,241,0.15)',
-                border: '1px solid rgba(99,102,241,0.3)',
-                color: 'var(--primary-400)',
-                fontSize: '13px',
-                fontWeight: 600
-              }}>
-                {roleLabels[user.role] || user.role}
-              </div>
+        <div className="flex items-center gap-4 mb-4" style={{ paddingBottom: '24px', borderBottom: '1px solid var(--border)' }}>
+          <div className="avatar" style={{ width: '64px', height: '64px', fontSize: '24px' }}>
+            {user.full_name ? user.full_name.split(' ').map(n => n[0]).slice(0, 2).join('') : '?'}
+          </div>
+          <div>
+            <h1 style={{ fontSize: '20px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+              {user.full_name || 'User Profile'}
+            </h1>
+            <div className="badge badge-info mt-1">
+              {roleLabels[user.role] || user.role}
             </div>
           </div>
-          {user.role === 'student' && !isEditing && (
-            <button className="btn btn-primary" onClick={() => setIsEditing(true)}>
-              Edit Profile
-            </button>
-          )}
         </div>
 
         {user.role === 'student' && missingProfileFields.length > 0 && !isEditing && (
-          <div className="card mb-6" style={{ background: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)', color: '#fca5a5' }}>
+          <div className="mb-4" style={{ background: 'var(--danger-bg)', border: '1px solid #ffd4d1', padding: '12px 16px', borderRadius: 'var(--border-radius)', color: 'var(--danger)', fontSize: '14px' }}>
             ⚠️ <strong>Action Required:</strong> Please edit your profile to add: {missingProfileFields.join(', ')}.
           </div>
         )}
 
-        {/* Profile Grid */}
-        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#e2e8f0', marginBottom: '16px' }}>
+        <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px' }}>
           Personal & Academic Information
-        </h2>
+        </h3>
         
         {isEditing ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+          <div className="grid grid-2">
             <div className="form-group">
-              <label>Department <span className="text-danger">*</span></label>
+              <label className="form-label">Department <span className="text-danger">*</span></label>
               <input
                 className="form-control"
                 value={formData.department}
@@ -118,7 +97,7 @@ export default function ProfilePage() {
               />
             </div>
             <div className="form-group">
-              <label>Year <span className="text-danger">*</span></label>
+              <label className="form-label">Year <span className="text-danger">*</span></label>
               <select
                 className="form-control"
                 value={formData.year}
@@ -132,7 +111,7 @@ export default function ProfilePage() {
               </select>
             </div>
             <div className="form-group">
-              <label>Section <span className="text-danger">*</span></label>
+              <label className="form-label">Section <span className="text-danger">*</span></label>
               <input
                 className="form-control"
                 value={formData.section}
@@ -141,7 +120,7 @@ export default function ProfilePage() {
               />
             </div>
             <div className="form-group">
-              <label>College Email <span className="text-danger">*</span></label>
+              <label className="form-label">College Email <span className="text-danger">*</span></label>
               <input
                 className="form-control"
                 type="email"
@@ -160,61 +139,53 @@ export default function ProfilePage() {
             </div>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '4px' }}>Full Name</div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: '#e2e8f0' }}>{user.full_name || 'N/A'}</div>
+          <div className="grid grid-3">
+            <div>
+              <div className="text-muted" style={{ fontSize: '12px' }}>Full Name</div>
+              <div style={{ fontWeight: 500 }}>{user.full_name || 'N/A'}</div>
             </div>
-
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '4px' }}>Login / ID</div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: '#e2e8f0' }}>{user.login_id || user.register_no || user.id || 'N/A'}</div>
+            <div>
+              <div className="text-muted" style={{ fontSize: '12px' }}>Login / ID</div>
+              <div style={{ fontWeight: 500 }}>{user.login_id || user.register_no || user.id || 'N/A'}</div>
             </div>
-
             {user.register_no && (
-              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '4px' }}>Register Number</div>
-                <div style={{ fontSize: '15px', fontWeight: 600, color: '#e2e8f0' }}>{user.register_no}</div>
+              <div>
+                <div className="text-muted" style={{ fontSize: '12px' }}>Register Number</div>
+                <div style={{ fontWeight: 500 }}>{user.register_no}</div>
               </div>
             )}
-
             {user.roll_number && (
-              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '4px' }}>Roll Number</div>
-                <div style={{ fontSize: '15px', fontWeight: 600, color: '#e2e8f0' }}>{user.roll_number}</div>
+              <div>
+                <div className="text-muted" style={{ fontSize: '12px' }}>Roll Number</div>
+                <div style={{ fontWeight: 500 }}>{user.roll_number}</div>
               </div>
             )}
-
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '4px' }}>Department</div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: '#e2e8f0' }}>{user.department || 'Not Set'}</div>
+            <div>
+              <div className="text-muted" style={{ fontSize: '12px' }}>Department</div>
+              <div style={{ fontWeight: 500 }}>{user.department || 'Not Set'}</div>
             </div>
-
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '4px' }}>Academic Year</div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: '#e2e8f0' }}>{user.year ? `${user.year} Year` : 'Not Set'}</div>
+            <div>
+              <div className="text-muted" style={{ fontSize: '12px' }}>Academic Year</div>
+              <div style={{ fontWeight: 500 }}>{user.year ? `${user.year} Year` : 'Not Set'}</div>
             </div>
-
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '4px' }}>Section</div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: '#e2e8f0' }}>{user.section || 'Not Set'}</div>
+            <div>
+              <div className="text-muted" style={{ fontSize: '12px' }}>Section</div>
+              <div style={{ fontWeight: 500 }}>{user.section || 'Not Set'}</div>
             </div>
-
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '4px' }}>College Email</div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: '#e2e8f0' }}>{user.email || 'Not Set'}</div>
+            <div>
+              <div className="text-muted" style={{ fontSize: '12px' }}>College Email</div>
+              <div style={{ fontWeight: 500 }}>{user.email || 'Not Set'}</div>
             </div>
-
             {user.phone && (
-              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '4px' }}>Mobile Number</div>
-                <div style={{ fontSize: '15px', fontWeight: 600, color: '#e2e8f0' }}>{user.phone}</div>
+              <div>
+                <div className="text-muted" style={{ fontSize: '12px' }}>Mobile Number</div>
+                <div style={{ fontWeight: 500 }}>{user.phone}</div>
               </div>
             )}
           </div>
         )}
 
-        <div style={{ marginTop: '32px', paddingTop: '20px', borderTop: '1px solid var(--border-dark)', fontSize: '12px', color: 'var(--gray-500)' }}>
+        <div className="text-muted mt-4" style={{ fontSize: '12px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
           Institution: Kangeyam Institute of Technology • KI Smart Attendance+ System
         </div>
       </div>

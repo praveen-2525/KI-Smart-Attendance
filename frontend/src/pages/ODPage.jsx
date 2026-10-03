@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+﻿import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { odApi, API_BASE_URL } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -224,7 +224,7 @@ export default function ODPage() {
       case 'Rejected':
         return <span className="badge badge-rejected">❌ Rejected</span>;
       case 'Cancelled':
-        return <span className="badge" style={{ background: 'rgba(148,163,184,0.15)', color: '#94a3b8' }}>🚫 Cancelled</span>;
+        return <span className="badge" style={{ background: 'rgba(148,163,184,0.15)', color: 'var(--text-secondary)' }}>🚫 Cancelled</span>;
       default:
         return <span className="badge badge-pending">⏳ Pending</span>;
     }
@@ -249,16 +249,16 @@ export default function ODPage() {
       {/* Page Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ fontSize: 24, fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <h2 style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 10 }}>
             <span>🎫</span> On Duty (OD) Request
           </h2>
-          <p style={{ color: 'var(--gray-400)', fontSize: 14, marginTop: 2 }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginTop: 2 }}>
             {isStudent ? 'Apply for On-Duty attendance for hackathons, symposiums, sports & events.' : 'Review and process student On-Duty applications.'}
           </p>
         </div>
 
         {/* Tab switcher */}
-        <div style={{ display: 'flex', background: 'var(--surface-dark-2)', borderRadius: 12, padding: 4, border: '1px solid var(--border-dark)' }}>
+        <div style={{ display: 'flex', background: 'var(--bg-surface)', borderRadius: 12, padding: 4, border: '1px solid var(--border)' }}>
           {isStudent && (
             <button
               className={`btn btn-sm ${activeTab === 'form' ? 'btn-primary' : 'btn-ghost'}`}
@@ -290,40 +290,40 @@ export default function ODPage() {
         <div className="card mb-6" style={{ maxWidth: 950, margin: '0 auto' }}>
           {/* Read-Only Student Profile Card */}
           <div style={{
-            background: 'var(--surface-dark-3)',
+            background: 'var(--bg-body)',
             borderRadius: 12,
             padding: '16px 20px',
             marginBottom: 24,
-            border: '1px solid var(--border-dark)'
+            border: '1px solid var(--border)'
           }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary-400)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--secondary)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
               🔒 Authenticated Student Profile (Auto-Populated)
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
               <div>
-                <span style={{ fontSize: 11, color: 'var(--gray-500)', display: 'block' }}>Student Name</span>
-                <strong style={{ fontSize: 14, color: '#f8fafc' }}>{user?.full_name || user?.name || 'N/A'}</strong>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block' }}>Student Name</span>
+                <strong style={{ fontSize: 14, color: 'var(--text-primary)' }}>{user?.full_name || user?.name || 'N/A'}</strong>
               </div>
               <div>
-                <span style={{ fontSize: 11, color: 'var(--gray-500)', display: 'block' }}>Register Number</span>
-                <strong style={{ fontSize: 14, color: '#f8fafc' }}>{user?.register_number || user?.login_id || 'N/A'}</strong>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block' }}>Register Number</span>
+                <strong style={{ fontSize: 14, color: 'var(--text-primary)' }}>{user?.register_number || user?.login_id || 'N/A'}</strong>
               </div>
               <div>
-                <span style={{ fontSize: 11, color: 'var(--gray-500)', display: 'block' }}>Department</span>
-                <strong style={{ fontSize: 14, color: '#f8fafc' }}>{user?.department || 'CSE(AI&ML)'}</strong>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block' }}>Department</span>
+                <strong style={{ fontSize: 14, color: 'var(--text-primary)' }}>{user?.department || 'CSE(AI&ML)'}</strong>
               </div>
               <div>
-                <span style={{ fontSize: 11, color: 'var(--gray-500)', display: 'block' }}>Year & Section</span>
-                <strong style={{ fontSize: 14, color: '#f8fafc' }}>{user?.year || 'III Year'} - {user?.section || 'AIML'}</strong>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block' }}>Year & Section</span>
+                <strong style={{ fontSize: 14, color: 'var(--text-primary)' }}>{user?.year || 'III Year'} - {user?.section || 'AIML'}</strong>
               </div>
               <div>
-                <span style={{ fontSize: 11, color: 'var(--gray-500)', display: 'block' }}>College Email</span>
-                <strong style={{ fontSize: 14, color: '#f8fafc' }}>{user?.email || 'N/A'}</strong>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block' }}>College Email</span>
+                <strong style={{ fontSize: 14, color: 'var(--text-primary)' }}>{user?.email || 'N/A'}</strong>
               </div>
             </div>
           </div>
 
-          <h3 style={{ fontSize: 18, fontWeight: 700, color: '#f8fafc', marginBottom: 20 }}>
+          <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 20 }}>
             Event & On-Duty Details
           </h3>
 
@@ -420,7 +420,7 @@ export default function ODPage() {
                   className="form-input"
                   value={numberOfDays > 0 ? `${numberOfDays} Day(s)` : 'Select valid dates'}
                   readOnly
-                  style={{ background: 'var(--surface-dark-4)', color: 'var(--primary-300)', fontWeight: 700 }}
+                  style={{ background: 'var(--surface-dark-4)', color: 'var(--secondary)', fontWeight: 700 }}
                 />
               </div>
 
@@ -519,9 +519,9 @@ export default function ODPage() {
                       📄 Selected: {docFile.name} ({(docFile.size / 1024 / 1024).toFixed(2)} MB)
                     </div>
                   ) : (
-                    <div style={{ color: 'var(--gray-400)', fontSize: 13 }}>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
                       📎 Click to upload event invitation, registration proof, or acceptance mail<br />
-                      <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>Allowed: PDF, JPG, PNG (Max 10MB)</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Allowed: PDF, JPG, PNG (Max 10MB)</span>
                     </div>
                   )}
                 </div>
@@ -584,7 +584,7 @@ export default function ODPage() {
 
               {/* Parent Permission Checkbox */}
               <div className="form-group" style={{ gridColumn: 'span 2', background: 'rgba(99,102,241,0.08)', padding: 14, borderRadius: 10, border: '1px solid rgba(99,102,241,0.2)' }}>
-                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', color: '#f8fafc', fontSize: 13 }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', color: 'var(--text-primary)', fontSize: 13 }}>
                   <input
                     type="checkbox"
                     style={{ marginTop: 2, width: 18, height: 18 }}
@@ -625,8 +625,8 @@ export default function ODPage() {
           {requestsList.length === 0 ? (
             <div className="card text-center" style={{ padding: '40px 20px' }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>🎫</div>
-              <h3 style={{ fontSize: 18, color: '#f8fafc', fontWeight: 700 }}>No OD Requests Found</h3>
-              <p style={{ color: 'var(--gray-500)', fontSize: 14, marginTop: 4 }}>
+              <h3 style={{ fontSize: 18, color: 'var(--text-primary)', fontWeight: 700 }}>No OD Requests Found</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: 14, marginTop: 4 }}>
                 {isStudent ? 'You have not submitted any OD requests yet.' : 'No pending OD applications to review.'}
               </p>
               {isStudent && (
@@ -640,7 +640,7 @@ export default function ODPage() {
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
                   <thead>
-                    <tr style={{ background: 'var(--surface-dark-3)', color: 'var(--gray-400)', borderBottom: '1px solid var(--border-dark)' }}>
+                    <tr style={{ background: 'var(--bg-body)', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }}>
                       <th style={{ padding: '14px 16px' }}>Request ID</th>
                       <th style={{ padding: '14px 16px' }}>Student Info</th>
                       <th style={{ padding: '14px 16px' }}>OD Type & Event</th>
@@ -653,38 +653,38 @@ export default function ODPage() {
                   </thead>
                   <tbody>
                     {requestsList.map((req) => (
-                      <tr key={req.requestId || req.id} style={{ borderBottom: '1px solid var(--border-dark)' }}>
-                        <td style={{ padding: '14px 16px', fontWeight: 700, color: 'var(--primary-300)' }}>
+                      <tr key={req.requestId || req.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '14px 16px', fontWeight: 700, color: 'var(--secondary)' }}>
                           {req.requestId || `OD-${req.id}`}
                         </td>
                         <td style={{ padding: '14px 16px' }}>
-                          <div style={{ fontWeight: 600, color: '#f8fafc' }}>{req.studentName}</div>
-                          <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{req.registerNumber}</div>
+                          <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{req.studentName}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{req.registerNumber}</div>
                         </td>
                         <td style={{ padding: '14px 16px' }}>
-                          <div style={{ fontWeight: 600, color: '#e2e8f0' }}>{req.eventName}</div>
-                          <div style={{ fontSize: 11, color: 'var(--primary-400)' }}>{req.odType}</div>
+                          <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{req.eventName}</div>
+                          <div style={{ fontSize: 11, color: 'var(--secondary)' }}>{req.odType}</div>
                         </td>
-                        <td style={{ padding: '14px 16px', color: 'var(--gray-400)' }}>
+                        <td style={{ padding: '14px 16px', color: 'var(--text-secondary)' }}>
                           📅 {req.fromDate} → {req.toDate}<br />
-                          <span style={{ fontSize: 11, color: 'var(--primary-400)', fontWeight: 600 }}>
+                          <span style={{ fontSize: 11, color: 'var(--secondary)', fontWeight: 600 }}>
                             {req.numberOfDays} Day(s) ({req.startTime} - {req.endTime})
                           </span>
                         </td>
-                        <td style={{ padding: '14px 16px', color: 'var(--gray-400)' }}>
+                        <td style={{ padding: '14px 16px', color: 'var(--text-secondary)' }}>
                           📍 {req.location} ({req.organization})
                         </td>
                         <td style={{ padding: '14px 16px' }}>
                           {getStatusBadge(req.status)}
                         </td>
-                        <td style={{ padding: '14px 16px', color: 'var(--gray-500)', fontSize: 12 }}>
+                        <td style={{ padding: '14px 16px', color: 'var(--text-muted)', fontSize: 12 }}>
                           {req.submittedAt ? new Date(req.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
                         </td>
                         <td style={{ padding: '14px 16px', textAlign: 'right' }}>
                           <button
                             className="btn btn-ghost btn-sm"
                             onClick={() => setSelectedRequest(req)}
-                            style={{ color: 'var(--primary-400)' }}
+                            style={{ color: 'var(--secondary)' }}
                           >
                             👁️ Details
                           </button>
@@ -711,33 +711,33 @@ export default function ODPage() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ background: 'var(--surface-dark-3)', padding: '12px 16px', borderRadius: 10, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, fontSize: 13 }}>
+              <div style={{ background: 'var(--bg-body)', padding: '12px 16px', borderRadius: 10, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, fontSize: 13 }}>
                 <div>
-                  <span style={{ fontSize: 11, color: 'var(--gray-500)', display: 'block' }}>Advisor Status</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block' }}>Advisor Status</span>
                   <strong style={{ color: selectedRequest.advisorStatus === 'APPROVED' ? 'var(--success)' : selectedRequest.advisorStatus === 'BYPASSED' ? 'var(--info)' : 'var(--warning)' }}>
                     {selectedRequest.advisorStatus || 'PENDING'}
                   </strong>
                 </div>
                 <div>
-                  <span style={{ fontSize: 11, color: 'var(--gray-500)', display: 'block' }}>HOD Status</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block' }}>HOD Status</span>
                   <strong style={{ color: selectedRequest.hodStatus === 'APPROVED' ? 'var(--success)' : selectedRequest.hodStatus === 'REJECTED' ? 'var(--danger)' : 'var(--warning)' }}>
                     {selectedRequest.hodStatus || 'ACTION_REQUIRED'}
                   </strong>
                 </div>
                 <div>
-                  <span style={{ fontSize: 11, color: 'var(--gray-500)', display: 'block' }}>Final Status</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block' }}>Final Status</span>
                   {getStatusBadge(selectedRequest.status)}
                 </div>
               </div>
 
               {selectedRequest.approvalType && (
                 <div style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', padding: '10px 14px', borderRadius: 8, fontSize: 13 }}>
-                  <span style={{ color: 'var(--primary-300)', fontWeight: 700 }}>Approval Method: </span>
-                  <span style={{ color: '#f8fafc' }}>
+                  <span style={{ color: 'var(--secondary)', fontWeight: 700 }}>Approval Method: </span>
+                  <span style={{ color: 'var(--text-primary)' }}>
                     {selectedRequest.approvalType === 'HOD_DIRECT_APPROVAL' ? '⚡ Direct HOD Approval (Advisor Bypassed)' : selectedRequest.approvalType === 'NORMAL_HOD_APPROVAL' ? '✅ Approved by HOD (Post Advisor Review)' : selectedRequest.approvalType}
                   </span>
                   {selectedRequest.approvedBy && (
-                    <div style={{ color: 'var(--gray-400)', fontSize: 12, marginTop: 2 }}>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginTop: 2 }}>
                       Approved By: <strong>{selectedRequest.approvedBy}</strong> ({selectedRequest.approvedByRole || 'HOD'})
                     </div>
                   )}
@@ -746,50 +746,50 @@ export default function ODPage() {
 
               <div className="grid-2" style={{ fontSize: 13, gap: 12 }}>
                 <div>
-                  <span style={{ color: 'var(--gray-500)', display: 'block' }}>Student Name</span>
-                  <strong style={{ color: '#f8fafc' }}>{selectedRequest.studentName}</strong>
+                  <span style={{ color: 'var(--text-muted)', display: 'block' }}>Student Name</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{selectedRequest.studentName}</strong>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--gray-500)', display: 'block' }}>Register Number</span>
-                  <strong style={{ color: '#f8fafc' }}>{selectedRequest.registerNumber}</strong>
+                  <span style={{ color: 'var(--text-muted)', display: 'block' }}>Register Number</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{selectedRequest.registerNumber}</strong>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--gray-500)', display: 'block' }}>Department & Class</span>
-                  <strong style={{ color: '#f8fafc' }}>{selectedRequest.department} ({selectedRequest.year} - {selectedRequest.section})</strong>
+                  <span style={{ color: 'var(--text-muted)', display: 'block' }}>Department & Class</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{selectedRequest.department} ({selectedRequest.year} - {selectedRequest.section})</strong>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--gray-500)', display: 'block' }}>College Email</span>
-                  <strong style={{ color: '#f8fafc' }}>{selectedRequest.collegeEmail}</strong>
+                  <span style={{ color: 'var(--text-muted)', display: 'block' }}>College Email</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{selectedRequest.collegeEmail}</strong>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--gray-500)', display: 'block' }}>OD Type & Event</span>
-                  <strong style={{ color: 'var(--primary-300)' }}>{selectedRequest.odType} - {selectedRequest.eventName}</strong>
+                  <span style={{ color: 'var(--text-muted)', display: 'block' }}>OD Type & Event</span>
+                  <strong style={{ color: 'var(--secondary)' }}>{selectedRequest.odType} - {selectedRequest.eventName}</strong>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--gray-500)', display: 'block' }}>Organizing Entity</span>
-                  <strong style={{ color: '#f8fafc' }}>{selectedRequest.organization} ({selectedRequest.location})</strong>
+                  <span style={{ color: 'var(--text-muted)', display: 'block' }}>Organizing Entity</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{selectedRequest.organization} ({selectedRequest.location})</strong>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--gray-500)', display: 'block' }}>Dates & Duration</span>
-                  <strong style={{ color: '#f8fafc' }}>{selectedRequest.fromDate} → {selectedRequest.toDate} ({selectedRequest.numberOfDays} Days)</strong>
+                  <span style={{ color: 'var(--text-muted)', display: 'block' }}>Dates & Duration</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{selectedRequest.fromDate} → {selectedRequest.toDate} ({selectedRequest.numberOfDays} Days)</strong>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--gray-500)', display: 'block' }}>Event Timing</span>
-                  <strong style={{ color: '#f8fafc' }}>{selectedRequest.startTime} - {selectedRequest.endTime}</strong>
+                  <span style={{ color: 'var(--text-muted)', display: 'block' }}>Event Timing</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{selectedRequest.startTime} - {selectedRequest.endTime}</strong>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--gray-500)', display: 'block' }}>Faculty Coordinator</span>
-                  <strong style={{ color: '#f8fafc' }}>{selectedRequest.facultyCoordinator} ({selectedRequest.coordinatorContact})</strong>
+                  <span style={{ color: 'var(--text-muted)', display: 'block' }}>Faculty Coordinator</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{selectedRequest.facultyCoordinator} ({selectedRequest.coordinatorContact})</strong>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--gray-500)', display: 'block' }}>Travel Details</span>
-                  <strong style={{ color: '#f8fafc' }}>{selectedRequest.travelRequired ? `Yes (${selectedRequest.travelMode})` : 'No'}</strong>
+                  <span style={{ color: 'var(--text-muted)', display: 'block' }}>Travel Details</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{selectedRequest.travelRequired ? `Yes (${selectedRequest.travelMode})` : 'No'}</strong>
                 </div>
               </div>
 
               <div style={{ background: 'var(--surface-dark-4)', padding: 12, borderRadius: 8, fontSize: 13 }}>
-                <span style={{ color: 'var(--gray-500)', display: 'block', marginBottom: 4 }}>Purpose / Description:</span>
-                <p style={{ color: '#e2e8f0', margin: 0, whiteSpace: 'pre-wrap' }}>{selectedRequest.purpose}</p>
+                <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Purpose / Description:</span>
+                <p style={{ color: 'var(--text-primary)', margin: 0, whiteSpace: 'pre-wrap' }}>{selectedRequest.purpose}</p>
               </div>
 
               {selectedRequest.supportingDocument && (
@@ -808,15 +808,15 @@ export default function ODPage() {
 
               {/* Approval History Timeline */}
               {selectedRequest.approvalHistory && selectedRequest.approvalHistory.length > 0 && (
-                <div style={{ background: 'var(--surface-dark-3)', padding: 12, borderRadius: 8, fontSize: 12 }}>
-                  <span style={{ color: 'var(--gray-400)', fontWeight: 700, display: 'block', marginBottom: 8 }}>📜 Audit & Approval History</span>
+                <div style={{ background: 'var(--bg-body)', padding: 12, borderRadius: 8, fontSize: 12 }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 700, display: 'block', marginBottom: 8 }}>📜 Audit & Approval History</span>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {selectedRequest.approvalHistory.map((item, idx) => (
-                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--gray-300)', background: 'var(--surface-dark-4)', padding: '6px 10px', borderRadius: 6 }}>
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-primary)', background: 'var(--surface-dark-4)', padding: '6px 10px', borderRadius: 6 }}>
                         <span>
                           <strong>{item.action}</strong> by {item.role} {item.approvalType ? `(${item.approvalType})` : ''}
                         </span>
-                        <span style={{ color: 'var(--gray-500)' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>
                           {item.timestamp ? new Date(item.timestamp).toLocaleString('en-IN') : ''}
                         </span>
                       </div>
@@ -828,7 +828,7 @@ export default function ODPage() {
               {selectedRequest.reviewerRemarks && (
                 <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', padding: 12, borderRadius: 8, fontSize: 13 }}>
                   <span style={{ color: 'var(--warning)', fontWeight: 700, display: 'block' }}>Faculty/HOD Remarks:</span>
-                  <p style={{ color: '#e2e8f0', margin: '4px 0 0' }}>{selectedRequest.reviewerRemarks}</p>
+                  <p style={{ color: 'var(--text-primary)', margin: '4px 0 0' }}>{selectedRequest.reviewerRemarks}</p>
                 </div>
               )}
 
@@ -866,3 +866,5 @@ export default function ODPage() {
     </div>
   );
 }
+
+

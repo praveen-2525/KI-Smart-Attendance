@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { attendanceApi } from '../services/api';
 
@@ -31,8 +31,8 @@ export default function PlannerPage() {
   return (
     <div className="page-content animate-fade-in">
       <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 800, color: '#e2e8f0' }}>🎯 Smart Attendance Planner</h2>
-        <p style={{ color: 'var(--gray-500)', fontSize: 14 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)' }}>🎯 Smart Attendance Planner</h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
           Calculate exactly how many classes you need to attend or can afford to miss.
         </p>
       </div>
@@ -40,8 +40,8 @@ export default function PlannerPage() {
       {/* Target slider */}
       <div className="card mb-6">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>Target Attendance</span>
-          <span style={{ fontSize: 24, fontWeight: 800, color: 'var(--primary-400)' }}>{targetPct}%</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Target Attendance</span>
+          <span style={{ fontSize: 24, fontWeight: 800, color: 'var(--secondary)' }}>{targetPct}%</span>
         </div>
         <input
           type="range"
@@ -50,7 +50,7 @@ export default function PlannerPage() {
           onChange={(e) => setTargetPct(Number(e.target.value))}
           style={{ width: '100%', accentColor: 'var(--primary-500)' }}
         />
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--gray-600)', marginTop: 4 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-secondary)', marginTop: 4 }}>
           <span>50%</span>
           <span>75% (Standard)</span>
           <span>100%</span>
@@ -61,9 +61,9 @@ export default function PlannerPage() {
       <div className="grid-2 mb-6">
         <div className="planner-card">
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, color: 'var(--gray-500)', marginBottom: 4 }}>Current Overall</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>Current Overall</div>
             <div className="planner-value">{overall.current_percentage || 0}%</div>
-            <div style={{ fontSize: 13, color: 'var(--gray-400)', marginTop: 4 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
               {overall.current_credited || 0} credited / {overall.current_total || 0} eligible hours
             </div>
           </div>
@@ -77,7 +77,7 @@ export default function PlannerPage() {
               <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--success)' }}>
                 You're above {targetPct}%!
               </div>
-              <div style={{ fontSize: 13, color: 'var(--gray-400)', marginTop: 4 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
                 You can miss up to{' '}
                 <span style={{ color: 'var(--success)', fontWeight: 700 }}>{overall.classes_can_miss}</span>
                 {' '}more classes while staying at {targetPct}%.
@@ -92,7 +92,7 @@ export default function PlannerPage() {
               <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--danger)' }}>
                 Below {targetPct}% Target
               </div>
-              <div style={{ fontSize: 13, color: 'var(--gray-400)', marginTop: 4 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
                 You need{' '}
                 <span style={{ color: 'var(--danger)', fontWeight: 700, fontSize: 18 }}>{overall.classes_needed}</span>
                 {' '}more consecutive credited classes to reach {targetPct}%.
@@ -100,15 +100,15 @@ export default function PlannerPage() {
             </div>
           )}
 
-          <div style={{ marginTop: 16, fontSize: 12, color: 'var(--gray-600)', fontStyle: 'italic' }}>
+          <div style={{ marginTop: 16, fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
             {overall.message}
           </div>
         </div>
 
         {/* What-If Simulator */}
         <div className="card">
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>🔮 What-If Simulator</h3>
-          <p style={{ fontSize: 12, color: 'var(--gray-500)', marginBottom: 16 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>🔮 What-If Simulator</h3>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
             Simulate future attendance scenarios
           </p>
 
@@ -130,7 +130,7 @@ export default function PlannerPage() {
           <div className="grid-2">
             {[
               { key: 'future_present', label: 'Present', icon: '✅', color: 'var(--success)' },
-              { key: 'future_od', label: 'OD', icon: '🎫', color: 'var(--primary-400)' },
+              { key: 'future_od', label: 'OD', icon: '🎫', color: 'var(--secondary)' },
               { key: 'future_leave', label: 'Leave', icon: '📋', color: 'var(--warning)' },
               { key: 'future_absent', label: 'Absent', icon: '❌', color: 'var(--danger)' },
             ].map(({ key, label, icon, color }) => (
@@ -163,13 +163,13 @@ export default function PlannerPage() {
               border: `1px solid ${whatIfResult.reaches_target ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 13, color: 'var(--gray-400)' }}>Current</span>
-                <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--gray-300)' }}>
+                <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Current</span>
+                <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
                   {whatIfResult.original_percentage}%
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 13, color: 'var(--gray-400)' }}>After simulation</span>
+                <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>After simulation</span>
                 <span style={{
                   fontSize: 20, fontWeight: 800,
                   color: whatIfResult.reaches_target ? 'var(--success)' : 'var(--danger)'
@@ -178,7 +178,7 @@ export default function PlannerPage() {
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 13, color: 'var(--gray-400)' }}>Change</span>
+                <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Change</span>
                 <span style={{
                   fontSize: 14, fontWeight: 700,
                   color: whatIfResult.percentage_change >= 0 ? 'var(--success)' : 'var(--danger)'
@@ -201,20 +201,20 @@ export default function PlannerPage() {
 
       {/* Subject-wise planner */}
       <div className="card">
-        <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginBottom: 16 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 16 }}>
           Subject-wise Planning
         </h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {subjects.map((s) => (
             <div key={s.subject_id} style={{
-              background: 'var(--surface-dark-3)',
-              border: '1px solid var(--border-dark)',
+              background: 'var(--bg-body)',
+              border: '1px solid var(--border)',
               borderRadius: 12, padding: 16
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: '#e2e8f0' }}>{s.subject_name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--gray-500)' }}>{s.subject_code}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{s.subject_name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{s.subject_code}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{
@@ -223,7 +223,7 @@ export default function PlannerPage() {
                   }}>
                     {s.current_percentage}%
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                     {s.current_credited}/{s.current_total} hrs
                   </div>
                 </div>
@@ -260,3 +260,5 @@ export default function PlannerPage() {
     </div>
   );
 }
+
+

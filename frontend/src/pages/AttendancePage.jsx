@@ -9,7 +9,7 @@ const STATUS_STYLES = {
   OD: { bg: 'rgba(99,102,241,0.15)', color: '#818cf8', label: 'On Duty' },
   LE: { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', label: 'Leave' },
   ML: { bg: 'rgba(139,92,246,0.15)', color: '#a78bfa', label: 'Medical Leave' },
-  '-': { bg: 'rgba(255,255,255,0.03)', color: 'var(--gray-600)', label: 'Not Marked' },
+  '-': { bg: 'rgba(255,255,255,0.03)', color: 'var(--text-secondary)', label: 'Not Marked' },
 };
 
 function AttendanceCalendar({ year, month }) {
@@ -21,7 +21,7 @@ function AttendanceCalendar({ year, month }) {
     select: (res) => res.data,
   });
 
-  if (isLoading) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--gray-500)' }}>Loading calendar...</div>;
+  if (isLoading) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Loading calendar...</div>;
 
   const calendar = data?.calendar || {};
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -95,7 +95,7 @@ function AttendanceCalendar({ year, month }) {
               width: 14, height: 14, borderRadius: 4,
               background: style.bg, border: `1px solid ${style.color}40`
             }} />
-            <span style={{ fontSize: 12, color: 'var(--gray-500)' }}>{status} - {style.label}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{status} - {style.label}</span>
           </div>
         ))}
       </div>
@@ -103,16 +103,16 @@ function AttendanceCalendar({ year, month }) {
       {/* Selected date detail */}
       {selectedDate && (
         <div style={{
-          marginTop: 20, background: 'var(--surface-dark-3)',
-          border: '1px solid var(--border-dark)', borderRadius: 12, padding: 16
+          marginTop: 20, background: 'var(--bg-body)',
+          border: '1px solid var(--border)', borderRadius: 12, padding: 16
         }}>
-          <div style={{ fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>
+          <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12 }}>
             📅 {new Date(selectedDate).toLocaleDateString('en-IN', {
               weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
             })}
           </div>
           {selectedRecords.length === 0 ? (
-            <div style={{ color: 'var(--gray-500)', fontSize: 13 }}>No attendance records for this date</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>No attendance records for this date</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {selectedRecords.map((r, idx) => {
@@ -131,9 +131,9 @@ function AttendanceCalendar({ year, month }) {
                       P{r.period_number}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{r.subject_name}</div>
-                      {r.faculty_name && <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{r.faculty_name}</div>}
-                      {r.start_time && <div style={{ fontSize: 11, color: 'var(--gray-600)' }}>{r.start_time?.slice(0,5)} - {r.end_time?.slice(0,5)}</div>}
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{r.subject_name}</div>
+                      {r.faculty_name && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.faculty_name}</div>}
+                      {r.start_time && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{r.start_time?.slice(0,5)} - {r.end_time?.slice(0,5)}</div>}
                     </div>
                     <span className={`badge badge-${r.status?.toLowerCase()}`}>{r.status}</span>
                   </div>
@@ -188,9 +188,9 @@ function SubjectDetail({ subjects }) {
             {selected?.subject_id === s.subject_id && (
               <div style={{ width: '100%', marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8 }}>
                 {[
-                  { label: 'Total', value: s.total_hours, color: 'var(--gray-400)' },
+                  { label: 'Total', value: s.total_hours, color: 'var(--text-secondary)' },
                   { label: 'Present', value: s.pr_hours, color: 'var(--success)' },
-                  { label: 'OD', value: s.od_hours, color: 'var(--primary-400)' },
+                  { label: 'OD', value: s.od_hours, color: 'var(--secondary)' },
                   { label: 'Leave', value: s.le_hours, color: 'var(--warning)' },
                   { label: 'Absent', value: s.ab_hours, color: 'var(--danger)' },
                 ].map((item) => (
@@ -199,7 +199,7 @@ function SubjectDetail({ subjects }) {
                     padding: '8px', textAlign: 'center'
                   }}>
                     <div style={{ fontSize: 18, fontWeight: 700, color: item.color }}>{item.value}</div>
-                    <div style={{ fontSize: 10, color: 'var(--gray-600)', marginTop: 2 }}>{item.label}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 2 }}>{item.label}</div>
                   </div>
                 ))}
               </div>
@@ -241,29 +241,30 @@ export default function AttendancePage() {
   return (
     <div className="page-content animate-fade-in">
       <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 800, color: '#e2e8f0' }}>My Attendance</h2>
-        <p style={{ color: 'var(--gray-500)', fontSize: 14 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)' }}>My Attendance</h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
           Attendance formula: (PR + OD) / Total × 100 — as per ERP configuration
         </p>
       </div>
 
       {/* Overall summary card */}
       <div className="card mb-6" style={{
-        background: 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.05) 100%)',
-        border: '1px solid rgba(99,102,241,0.2)'
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border-color)',
+        boxShadow: 'var(--shadow-sm)'
       }}>
         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
           {[
-            { label: 'Total Hours', value: overall.total_hours || 0, color: 'var(--gray-300)' },
+            { label: 'Total Hours', value: overall.total_hours || 0, color: 'var(--text-primary)' },
             { label: 'Present (PR)', value: overall.pr_hours || 0, color: 'var(--success)' },
-            { label: 'On Duty (OD)', value: overall.od_hours || 0, color: 'var(--primary-400)' },
+            { label: 'On Duty (OD)', value: overall.od_hours || 0, color: 'var(--secondary)' },
             { label: 'Absent (AB)', value: overall.ab_hours || 0, color: 'var(--danger)' },
             { label: 'Leave (LE)', value: overall.le_hours || 0, color: 'var(--warning)' },
-            { label: 'Credited', value: overall.credited_hours || 0, color: 'var(--primary-300)' },
+            { label: 'Credited', value: overall.credited_hours || 0, color: 'var(--secondary)' },
           ].map((item) => (
             <div key={item.label} style={{ textAlign: 'center', flex: '1 1 80px' }}>
               <div style={{ fontSize: 26, fontWeight: 800, color: item.color }}>{item.value}</div>
-              <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{item.label}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{item.label}</div>
             </div>
           ))}
           <div style={{
@@ -278,7 +279,7 @@ export default function AttendancePage() {
             }}>
               {overall.percentage || 0}%
             </div>
-            <div style={{ fontSize: 12, color: 'var(--gray-500)' }}>Overall Attendance</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Overall Attendance</div>
             {overall.is_below_target && (
               <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>⚠ Below {overall.target_percentage}%</div>
             )}
@@ -287,7 +288,7 @@ export default function AttendancePage() {
       </div>
 
       {/* Tab navigation */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 20, background: 'var(--surface-dark-3)', borderRadius: 10, padding: 4, width: 'fit-content' }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20, background: 'var(--bg-body)', borderRadius: 10, padding: 4, width: 'fit-content' }}>
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -302,7 +303,7 @@ export default function AttendancePage() {
       {/* Tab content */}
       {tab === 'overview' && (
         <div className="card">
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginBottom: 16 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 16 }}>
             Subject-wise Attendance
           </h3>
           {isLoading ? (
@@ -323,7 +324,7 @@ export default function AttendancePage() {
             >
               ← Prev
             </button>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0' }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
               {format(calMonth, 'MMMM yyyy')}
             </h3>
             <button
@@ -387,10 +388,10 @@ export default function AttendancePage() {
                       <td>{r.date && new Date(r.date).toLocaleDateString('en-IN')}</td>
                       <td>P{r.period_number}</td>
                       <td>
-                        <div style={{ fontWeight: 600, color: '#e2e8f0' }}>{r.subject_name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>{r.subject_code}</div>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{r.subject_name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.subject_code}</div>
                       </td>
-                      <td style={{ color: 'var(--gray-400)', fontSize: 13 }}>{r.faculty_name || '-'}</td>
+                      <td style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{r.faculty_name || '-'}</td>
                       <td>
                         <span className={`badge badge-${r.status?.toLowerCase()}`}>{r.status}</span>
                       </td>
@@ -399,7 +400,7 @@ export default function AttendancePage() {
                 })}
                 {!historyData?.records?.length && (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', color: 'var(--gray-600)', padding: 40 }}>
+                    <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: 40 }}>
                       No records found
                     </td>
                   </tr>
@@ -412,3 +413,5 @@ export default function AttendancePage() {
     </div>
   );
 }
+
+

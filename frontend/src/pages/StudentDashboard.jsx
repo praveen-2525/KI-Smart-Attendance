@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { attendanceApi, timetableApi, odApi, leaveApi, notifApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
-import { RadialBarChart, RadialBar, Cell, ResponsiveContainer } from 'recharts';
 
 const getAttendanceColor = (pct) => {
   if (pct >= 85) return 'var(--success)';
@@ -11,26 +10,26 @@ const getAttendanceColor = (pct) => {
 };
 
 const getAttendanceBg = (pct) => {
-  if (pct >= 85) return 'rgba(16,185,129,0.1)';
-  if (pct >= 75) return 'rgba(245,158,11,0.1)';
-  return 'rgba(239,68,68,0.1)';
+  if (pct >= 85) return 'var(--success-bg)';
+  if (pct >= 75) return 'var(--warning-bg)';
+  return 'var(--danger-bg)';
 };
 
-function AttendanceCircle({ percentage, size = 140 }) {
+function AttendanceCircle({ percentage, size = 120 }) {
   const color = getAttendanceColor(percentage);
-  const circumference = 2 * Math.PI * 50;
+  const circumference = 2 * Math.PI * 45;
   const strokeDash = (percentage / 100) * circumference;
 
   return (
-    <div style={{ position: 'relative', width: size, height: size }}>
-      <svg width={size} height={size} viewBox="0 0 120 120">
-        <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="10" />
+    <div style={{ position: 'relative', width: size, height: size, margin: '0 auto' }}>
+      <svg width={size} height={size} viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="45" fill="none" stroke="var(--border)" strokeWidth="8" />
         <circle
-          cx="60" cy="60" r="50" fill="none"
-          stroke={color} strokeWidth="10"
+          cx="50" cy="50" r="45" fill="none"
+          stroke={color} strokeWidth="8"
           strokeDasharray={`${strokeDash} ${circumference}`}
           strokeLinecap="round"
-          transform="rotate(-90 60 60)"
+          transform="rotate(-90 50 50)"
           style={{ transition: 'stroke-dasharray 1s ease' }}
         />
       </svg>
@@ -38,8 +37,7 @@ function AttendanceCircle({ percentage, size = 140 }) {
         position: 'absolute', inset: 0, display: 'flex',
         flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
       }}>
-        <div style={{ fontSize: size * 0.18, fontWeight: 800, color }}>{percentage}%</div>
-        <div style={{ fontSize: size * 0.1, color: 'var(--gray-500)' }}>Overall</div>
+        <div style={{ fontSize: size * 0.22, fontWeight: 700, color: 'var(--text-primary)' }}>{percentage}%</div>
       </div>
     </div>
   );
@@ -80,11 +78,8 @@ export default function StudentDashboard() {
 
   if (attLoading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-        <div>
-          <div className="spinner" style={{ width: 40, height: 40, borderWidth: 3, margin: '0 auto 12px' }} />
-          <div style={{ color: 'var(--gray-500)' }}>Loading your dashboard...</div>
-        </div>
+      <div className="flex items-center justify-center" style={{ height: '60vh' }}>
+        <div className="text-center text-muted">Loading your dashboard...</div>
       </div>
     );
   }
@@ -104,267 +99,186 @@ export default function StudentDashboard() {
   const currentPeriod = timetable.find(t => t.start_time <= nowTime && t.end_time >= nowTime);
 
   return (
-    <div className="page-content animate-fade-in">
+    <div className="page-content">
       {/* Welcome Banner */}
-      <div style={{
-        background: 'var(--gradient-brand)',
-        borderRadius: 'var(--border-radius-xl)',
-        padding: '24px 28px',
-        marginBottom: 24,
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
-        <div style={{
-          position: 'absolute', right: -20, top: -20,
-          width: 160, height: 160,
-          background: 'rgba(255,255,255,0.05)',
-          borderRadius: '50%'
-        }} />
-        <div style={{
-          position: 'absolute', right: 40, bottom: -40,
-          width: 100, height: 100,
-          background: 'rgba(255,255,255,0.05)',
-          borderRadius: '50%'
-        }} />
-        <div style={{ position: 'relative' }}>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>
-            Welcome back 👋
+      <div className="card mb-4" style={{ borderLeft: '4px solid var(--primary-500)' }}>
+        <div className="card-body flex items-center justify-between">
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>
+              Welcome, {user?.full_name}
+            </h2>
+            <div className="text-muted flex gap-4" style={{ fontSize: 14 }}>
+              <span>Department: {user?.department || 'N/A'}</span>
+              <span>Year: {user?.year || 'N/A'}</span>
+              <span>Reg No: {user?.register_number || 'N/A'}</span>
+            </div>
           </div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, color: 'white', marginBottom: 4 }}>
-            {user?.full_name}
-          </h2>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', display: 'flex', gap: 16 }}>
-            <span>📚 {user?.department || 'CSE(AI&ML)'}</span>
-            <span>📋 Year {user?.year}</span>
-            <span>🔢 {user?.register_number}</span>
-          </div>
+          <Link to="/profile" className="btn btn-outline">View Profile</Link>
         </div>
       </div>
 
       {/* Main stats grid */}
-      <div className="grid-4 mb-6">
-        {/* Overall Attendance - BIG */}
-        <div style={{ gridColumn: 'span 1' }}>
-          <div className="stat-card" style={{
-            background: getAttendanceBg(overallPct),
-            border: `1px solid ${getAttendanceColor(overallPct)}33`,
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            padding: '24px', minHeight: 180
-          }}>
+      <div className="grid grid-4 mb-4">
+        {/* Overall Attendance */}
+        <div className="card text-center" style={{ gridColumn: 'span 1' }}>
+          <div className="card-body flex flex-col items-center justify-center">
+            <h3 className="text-muted mb-3" style={{ fontSize: 14, fontWeight: 600 }}>Overall Attendance</h3>
             <AttendanceCircle percentage={Math.round(overallPct)} />
-            <div style={{ marginTop: 12, textAlign: 'center' }}>
-              <div style={{ fontSize: 12, color: 'var(--gray-500)' }}>
-                Target: {overall.target_percentage || 75}%
-              </div>
+            <div className="mt-3">
+              <div className="text-muted" style={{ fontSize: 12 }}>Target: {overall.target_percentage || 75}%</div>
               {isBelow && (
-                <div style={{
-                  marginTop: 8, fontSize: 11, color: 'var(--danger)',
-                  background: 'rgba(239,68,68,0.1)',
-                  borderRadius: 8, padding: '4px 10px', display: 'inline-block'
-                }}>
-                  ⚠️ Below target
-                </div>
+                <div className="badge badge-danger mt-1">Below Target</div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Stats cards */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div className="stat-card" style={{ padding: '16px', flex: 1 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <div className="stat-value" style={{ fontSize: 22, color: 'var(--success)' }}>{overall.pr_hours || 0}</div>
-                <div className="stat-label">Present Hours</div>
-              </div>
-              <div style={{ fontSize: 24 }}>✅</div>
+        {/* Stats Summary */}
+        <div className="grid grid-2" style={{ gridColumn: 'span 3', gap: '24px' }}>
+          <div className="stat-card">
+            <div className="stat-icon" style={{ background: 'var(--success-bg)', color: 'var(--success)' }}>✓</div>
+            <div className="stat-content">
+              <div className="stat-label">Present Hours</div>
+              <div className="stat-value text-success">{overall.pr_hours || 0}</div>
             </div>
           </div>
-          <div className="stat-card" style={{ padding: '16px', flex: 1 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <div className="stat-value" style={{ fontSize: 22, color: 'var(--primary-400)' }}>{overall.od_hours || 0}</div>
-                <div className="stat-label">OD Hours</div>
-              </div>
-              <div style={{ fontSize: 24 }}>🎫</div>
+          <div className="stat-card">
+            <div className="stat-icon" style={{ background: 'var(--info-bg)', color: 'var(--info)' }}>★</div>
+            <div className="stat-content">
+              <div className="stat-label">OD Hours</div>
+              <div className="stat-value" style={{ color: 'var(--info)' }}>{overall.od_hours || 0}</div>
             </div>
           </div>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div className="stat-card" style={{ padding: '16px', flex: 1 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <div className="stat-value" style={{ fontSize: 22, color: 'var(--danger)' }}>{overall.ab_hours || 0}</div>
-                <div className="stat-label">Absent Hours</div>
-              </div>
-              <div style={{ fontSize: 24 }}>❌</div>
+          <div className="stat-card">
+            <div className="stat-icon" style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }}>✕</div>
+            <div className="stat-content">
+              <div className="stat-label">Absent Hours</div>
+              <div className="stat-value text-danger">{overall.ab_hours || 0}</div>
             </div>
           </div>
-          <div className="stat-card" style={{ padding: '16px', flex: 1 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <div className="stat-value" style={{ fontSize: 22, color: 'var(--warning)' }}>{overall.le_hours || 0}</div>
-                <div className="stat-label">Leave Hours</div>
-              </div>
-              <div style={{ fontSize: 24 }}>📋</div>
+          <div className="stat-card">
+            <div className="stat-icon" style={{ background: 'var(--warning-bg)', color: 'var(--warning)' }}>-</div>
+            <div className="stat-content">
+              <div className="stat-label">Leave Hours</div>
+              <div className="stat-value" style={{ color: 'var(--warning)' }}>{overall.le_hours || 0}</div>
             </div>
-          </div>
-        </div>
-
-        {/* Today + Pending */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div className="stat-card" style={{ padding: '16px', flex: 1 }}>
-            <div style={{ fontSize: 20 }}>📅</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginTop: 4 }}>{timetable.length}</div>
-            <div className="stat-label">Classes Today</div>
-            {currentPeriod && (
-              <div style={{
-                marginTop: 8, fontSize: 11, color: 'var(--primary-300)',
-                background: 'rgba(99,102,241,0.1)', borderRadius: 6, padding: '3px 8px'
-              }}>
-                Current: P{currentPeriod.period_number} {currentPeriod.subject_name}
-              </div>
-            )}
-          </div>
-          <div className="stat-card" style={{ padding: '16px', flex: 1 }}>
-            <div style={{ fontSize: 20 }}>🔔</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: unreadNotif > 0 ? 'var(--warning)' : '#e2e8f0', marginTop: 4 }}>
-              {unreadNotif}
-            </div>
-            <div className="stat-label">Notifications</div>
           </div>
         </div>
       </div>
 
-      {/* Subject Attendance */}
-      <div className="grid-2 mb-6">
+      <div className="grid grid-2 mb-4">
+        {/* Pending Requests */}
         <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0' }}>Subject-wise Attendance</h3>
-            <Link to="/attendance" className="btn btn-ghost btn-sm">View All →</Link>
+          <div className="card-header">
+            <h3 className="card-title">Pending Requests</h3>
           </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {subjects.length === 0 && (
-              <div className="empty-state">
-                <div className="empty-state-desc">No attendance data yet</div>
+          <div className="card-body">
+            <div className="flex justify-between items-center mb-3 p-3" style={{ background: 'var(--bg-body)', borderRadius: 'var(--border-radius-sm)', border: '1px solid var(--border)' }}>
+              <div>
+                <div style={{ fontWeight: 600 }}>OD Requests</div>
+                <div className="text-muted" style={{ fontSize: 12 }}>Awaiting approval</div>
               </div>
-            )}
-            {subjects.slice(0, 5).map((s) => (
-              <div key={s.subject_id} className="subject-card">
-                <div style={{ flex: 1 }}>
-                  <div className="subject-name">{s.subject_name}</div>
-                  <div className="subject-code">{s.subject_code}</div>
-                  <div className="progress-bar">
-                    <div
-                      className={`progress-fill progress-${
-                        s.percentage >= 85 ? 'success' : s.percentage >= 75 ? 'warning' : 'danger'
-                      }`}
-                      style={{ width: `${s.percentage}%` }}
-                    />
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right', marginLeft: 16 }}>
-                  <div style={{
-                    fontSize: 20, fontWeight: 800,
-                    color: getAttendanceColor(s.percentage)
-                  }}>
-                    {s.percentage}%
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>
-                    {s.credited_hours}/{s.total_hours}
-                  </div>
-                  {s.is_below_target && (
-                    <span className="badge badge-ab" style={{ fontSize: 9, marginTop: 4 }}>Low</span>
-                  )}
-                </div>
+              <div className="badge badge-warning">{pendingOD} Pending</div>
+            </div>
+            <div className="flex justify-between items-center p-3" style={{ background: 'var(--bg-body)', borderRadius: 'var(--border-radius-sm)', border: '1px solid var(--border)' }}>
+              <div>
+                <div style={{ fontWeight: 600 }}>Leave Requests</div>
+                <div className="text-muted" style={{ fontSize: 12 }}>Awaiting approval</div>
               </div>
-            ))}
+              <div className="badge badge-warning">{pendingLeave} Pending</div>
+            </div>
           </div>
         </div>
 
-        {/* Today's Timetable + Quick Actions */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="card" style={{ flex: 1 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0' }}>Today's Schedule</h3>
-              <span style={{ fontSize: 12, color: 'var(--gray-500)' }}>
-                {new Date().toLocaleDateString('en-IN', { weekday: 'long' })}
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {timetable.length === 0 && (
-                <div className="empty-state">
-                  <div className="empty-state-desc">No classes today</div>
-                </div>
-              )}
-              {timetable.map((t) => (
-                <div key={t.id} className={`period-card${t.is_current ? ' current' : ''}`}>
-                  <div className="period-number">P{t.period_number}</div>
-                  <div style={{ flex: 1 }}>
-                    <div className="period-subject">{t.subject_name}</div>
-                    <div className="period-faculty">{t.faculty_name}</div>
-                  </div>
-                  <div className="period-time">{t.start_time?.slice(0, 5)} - {t.end_time?.slice(0, 5)}</div>
-                  {t.is_current && (
-                    <div style={{
-                      background: 'var(--gradient-brand)', color: 'white',
-                      fontSize: 10, fontWeight: 700, padding: '2px 8px',
-                      borderRadius: 10, whiteSpace: 'nowrap'
-                    }}>
-                      NOW
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+        {/* Timetable / Classes Today */}
+        <div className="card">
+          <div className="card-header flex justify-between items-center">
+            <h3 className="card-title">Today's Timetable</h3>
+            <span className="badge badge-info">{timetable.length} Classes</span>
           </div>
-
-          {/* Quick Actions */}
-          <div className="card">
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginBottom: 14 }}>Quick Actions</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-              {[
-                { label: 'Smart Planner', icon: '🎯', to: '/planner', color: '#6366f1' },
-                { label: 'Request OD', icon: '🎫', to: '/od', color: '#8b5cf6' },
-                { label: 'Request Leave', icon: '📋', to: '/leave', color: '#f59e0b' },
-                { label: 'Inform Late', icon: '⏰', to: '/late', color: '#10b981' },
-                { label: 'Correction', icon: '✏️', to: '/correction', color: '#ef4444' },
-                { label: 'Calendar', icon: '📅', to: '/attendance?tab=calendar', color: '#0ea5e9' },
-              ].map((qa) => (
-                <Link key={qa.label} to={qa.to} className="quick-action">
-                  <div className="quick-action-icon" style={{ background: `${qa.color}20` }}>
-                    {qa.icon}
-                  </div>
-                  {qa.label}
-                </Link>
-              ))}
-            </div>
+          <div className="card-body" style={{ padding: 0 }}>
+            {timetable.length > 0 ? (
+              <div className="table-container" style={{ border: 'none', borderRadius: 0 }}>
+                <table className="table" style={{ margin: 0 }}>
+                  <tbody>
+                    {timetable.map((t, idx) => {
+                      const isCurrent = currentPeriod?.period_number === t.period_number;
+                      return (
+                        <tr key={idx} style={isCurrent ? { background: 'var(--info-bg)' } : {}}>
+                          <td style={{ width: '40px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                            P{t.period_number}
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{t.subject_name}</div>
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t.faculty_name}</div>
+                          </td>
+                          <td className="text-right text-muted" style={{ fontSize: 12 }}>
+                            {t.start_time} - {t.end_time}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="empty-state" style={{ border: 'none' }}>
+                <div className="empty-state-title">No Classes Today</div>
+                <div className="empty-state-desc">You have no scheduled classes for today.</div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Pending requests */}
-      {(pendingOD > 0 || pendingLeave > 0) && (
-        <div className="card" style={{ background: 'rgba(245,158,11,0.05)', borderColor: 'rgba(245,158,11,0.2)' }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--warning)', marginBottom: 12 }}>
-            ⏳ Pending Requests
-          </h3>
-          <div style={{ display: 'flex', gap: 12 }}>
-            {pendingOD > 0 && (
-              <Link to="/od" style={{ textDecoration: 'none' }}>
-                <div className="badge badge-pending">{pendingOD} OD Pending</div>
-              </Link>
-            )}
-            {pendingLeave > 0 && (
-              <Link to="/leave" style={{ textDecoration: 'none' }}>
-                <div className="badge badge-pending">{pendingLeave} Leave Pending</div>
-              </Link>
-            )}
-          </div>
+      {/* Subject-wise Attendance */}
+      <div className="card mb-4">
+        <div className="card-header flex justify-between items-center">
+          <h3 className="card-title">Subject-wise Attendance</h3>
+          <Link to="/attendance" className="btn btn-secondary" style={{ fontSize: 12, padding: '4px 10px' }}>View Details</Link>
         </div>
-      )}
+        <div className="card-body" style={{ padding: 0 }}>
+          {subjects.length > 0 ? (
+            <div className="table-container" style={{ border: 'none', borderRadius: 0 }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Subject Code</th>
+                    <th>Subject Name</th>
+                    <th className="text-right">Classes Held</th>
+                    <th className="text-right">Attended</th>
+                    <th className="text-right">Percentage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {subjects.map((sub, idx) => (
+                    <tr key={idx}>
+                      <td style={{ fontWeight: 500 }}>{sub.subject_code}</td>
+                      <td>{sub.subject_name}</td>
+                      <td className="text-right">{sub.total_hours}</td>
+                      <td className="text-right text-success">{sub.pr_hours}</td>
+                      <td className="text-right">
+                        <span className="badge" style={{ 
+                          background: getAttendanceBg(sub.percentage),
+                          color: getAttendanceColor(sub.percentage),
+                          border: `1px solid ${getAttendanceColor(sub.percentage)}33`
+                        }}>
+                          {sub.percentage}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="empty-state" style={{ border: 'none' }}>
+              <div className="empty-state-title">No Data Available</div>
+              <div className="empty-state-desc">Attendance data is not yet available for this semester.</div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { lateApi, correctionApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -49,8 +49,8 @@ export function LateArrivalPage() {
     <div className="page-content animate-fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, color: '#e2e8f0' }}>⏰ Late Arrival / Inform</h2>
-          <p style={{ color: 'var(--gray-500)', fontSize: 14 }}>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)' }}>⏰ Late Arrival / Inform</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
             Notify faculty and advisor about your late arrival.
           </p>
         </div>
@@ -60,8 +60,8 @@ export function LateArrivalPage() {
       </div>
 
       <div className="card mb-6" style={{ background: 'rgba(99,102,241,0.05)', borderColor: 'rgba(99,102,241,0.2)' }}>
-        <div style={{ fontSize: 13, color: 'var(--gray-400)' }}>
-          📌 <strong style={{ color: 'var(--primary-300)' }}>Note:</strong> Late arrival notification does <strong>not</strong> automatically mark you as Present.
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+          📌 <strong style={{ color: 'var(--secondary)' }}>Note:</strong> Late arrival notification does <strong>not</strong> automatically mark you as Present.
           Faculty will verify your attendance and mark the appropriate status. This notification helps faculty and advisor
           know your expected arrival time.
         </div>
@@ -69,7 +69,7 @@ export function LateArrivalPage() {
 
       {showForm && (
         <div className="card mb-6">
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginBottom: 16 }}>Inform Late Arrival</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 16 }}>Inform Late Arrival</h3>
           <form onSubmit={handleSubmit}>
             <div className="grid-2">
               <div className="form-group">
@@ -113,10 +113,10 @@ export function LateArrivalPage() {
           <div key={r.id} className="card">
             <div style={{ display: 'flex', justify: 'space-between', gap: 20 }}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
                   {r.date} — Expected at {r.expected_arrival_time?.slice(0, 5)}
                 </div>
-                <div style={{ fontSize: 13, color: 'var(--gray-400)' }}>Reason: {r.reason}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Reason: {r.reason}</div>
               </div>
               <div className={`badge badge-${r.status === 'acknowledged' ? 'approved' : 'submitted'}`}>
                 {r.status}
@@ -206,8 +206,8 @@ export function CorrectionPage() {
     <div className="page-content animate-fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, color: '#e2e8f0' }}>✏️ Attendance Correction</h2>
-          <p style={{ color: 'var(--gray-500)', fontSize: 14 }}>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)' }}>✏️ Attendance Correction</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
             {isStudent ? 'Report incorrect attendance marks for faculty review.' : 'Review and process attendance correction requests.'}
           </p>
         </div>
@@ -219,7 +219,7 @@ export function CorrectionPage() {
       </div>
 
       <div className="card mb-6" style={{ background: 'rgba(239,68,68,0.05)', borderColor: 'rgba(239,68,68,0.2)' }}>
-        <div style={{ fontSize: 13, color: 'var(--gray-400)' }}>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
           📌 <strong style={{ color: 'var(--accent-rose)' }}>Important:</strong> You cannot directly modify attendance.
           Submit a correction request with your attendance record ID and explanation. Faculty will review and approve/reject.
           All changes are logged in the audit trail.
@@ -228,7 +228,7 @@ export function CorrectionPage() {
 
       {showForm && isStudent && (
         <div className="card mb-6">
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginBottom: 16 }}>Report Wrong Attendance</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 16 }}>Report Wrong Attendance</h3>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label className="form-label">Attendance Record ID *</label>
@@ -280,7 +280,7 @@ export function CorrectionPage() {
             </div>
           </div>
         ) : corrections.map((c) => {
-          const statusInfo = STATUS_COLORS[c.status] || { color: 'var(--gray-400)', label: c.status };
+          const statusInfo = STATUS_COLORS[c.status] || { color: 'var(--text-secondary)', label: c.status };
           return (
             <div key={c.id} className="card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -290,13 +290,13 @@ export function CorrectionPage() {
                       {statusInfo.label}
                     </div>
                     {c.record && (
-                      <span style={{ fontSize: 13, color: '#e2e8f0' }}>
+                      <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>
                         {c.record.subject_name} — {c.record.date} — P{c.record.period_number}
                       </span>
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', gap: 20, fontSize: 13, color: 'var(--gray-400)' }}>
+                  <div style={{ display: 'flex', gap: 20, fontSize: 13, color: 'var(--text-secondary)' }}>
                     <span>
                       Marked: <span className="badge badge-ab">{c.current_status}</span>
                     </span>
@@ -306,18 +306,18 @@ export function CorrectionPage() {
                     </span>
                   </div>
 
-                  <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 8 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
                     {c.explanation}
                   </div>
 
                   {isReviewer && c.student && (
-                    <div style={{ marginTop: 6, fontSize: 13, color: 'var(--gray-500)' }}>
-                      Student: <strong style={{ color: '#e2e8f0' }}>{c.student.name}</strong> ({c.student.register_number})
+                    <div style={{ marginTop: 6, fontSize: 13, color: 'var(--text-muted)' }}>
+                      Student: <strong style={{ color: 'var(--text-primary)' }}>{c.student.name}</strong> ({c.student.register_number})
                     </div>
                   )}
 
                   {c.faculty_notes && (
-                    <div style={{ marginTop: 6, fontSize: 12, color: 'var(--gray-500)', fontStyle: 'italic' }}>
+                    <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
                       Faculty note: {c.faculty_notes}
                     </div>
                   )}
@@ -346,3 +346,4 @@ export function CorrectionPage() {
     </div>
   );
 }
+

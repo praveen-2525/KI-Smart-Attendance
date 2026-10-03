@@ -180,26 +180,26 @@ export default function LoginPage() {
       <div className="login-left">
         <div style={{ textAlign: 'center', maxWidth: 520 }}>
           <div style={{
-            width: 80, height: 80, borderRadius: 20,
-            background: 'var(--gradient-brand)',
+            width: 72, height: 72, borderRadius: 16,
+            background: 'var(--primary-600)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 24px', fontSize: 36,
-            boxShadow: 'var(--shadow-glow)'
+            margin: '0 auto 20px', fontSize: 32, color: '#ffffff',
+            boxShadow: 'var(--shadow-md)'
           }}>
             🎓
           </div>
-          <div style={{ fontSize: 42, fontWeight: 800, lineHeight: 1.2, marginBottom: 12 }}>
-            <span style={{ background: 'var(--gradient-brand)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          <div style={{ fontSize: 36, fontWeight: 800, lineHeight: 1.2, marginBottom: 10 }}>
+            <span style={{ color: 'var(--primary-600)' }}>
               KI Smart
             </span>
             <br />
-            <span style={{ color: '#e2e8f0' }}>Attendance+</span>
+            <span style={{ color: 'var(--text-primary)' }}>Attendance+</span>
           </div>
-          <p style={{ fontSize: 18, color: 'var(--gray-500)', marginBottom: 40 }}>
-            Smart Attendance, Smarter Student Management
+          <p style={{ fontSize: 16, color: 'var(--text-secondary)', marginBottom: 32 }}>
+            Campus Attendance & Request Management System
           </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'left' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, textAlign: 'left' }}>
             {[
               { icon: '📊', title: 'Smart Attendance Planner', desc: 'Calculate classes needed to reach 75%' },
               { icon: '🎯', title: 'OD & Leave Management', desc: 'Full workflow with proof verification' },
@@ -208,14 +208,15 @@ export default function LoginPage() {
             ].map((f, i) => (
               <div key={i} style={{
                 display: 'flex', gap: 12, alignItems: 'flex-start',
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                borderRadius: 12, padding: '12px 16px'
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--border-radius-sm)', padding: '12px 16px',
+                boxShadow: 'var(--shadow-sm)'
               }}>
-                <span style={{ fontSize: 24 }}>{f.icon}</span>
+                <span style={{ fontSize: 22 }}>{f.icon}</span>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>{f.title}</div>
-                  <div style={{ fontSize: 12, color: 'var(--gray-500)' }}>{f.desc}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{f.title}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{f.desc}</div>
                 </div>
               </div>
             ))}
@@ -394,9 +395,9 @@ export default function LoginPage() {
             </form>
           )}
 
-          <div style={{ marginTop: 24, padding: '14px', background: 'rgba(99,102,241,0.08)', borderRadius: 10, border: '1px solid rgba(99,102,241,0.2)' }}>
-            <div style={{ fontSize: 11, color: 'var(--gray-500)', lineHeight: 1.6 }}>
-              <strong style={{ color: 'var(--primary-400)' }}>Secure System:</strong> This application is completely independent. Authentic accounts are required.
+          <div style={{ marginTop: 24, padding: '14px', background: 'var(--primary-50)', borderRadius: 'var(--border-radius-sm)', border: '1px solid var(--primary-100)' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              <strong style={{ color: 'var(--primary-600)' }}>Secure System:</strong> Registered institution users only. Accounts are issued by college administration.
             </div>
           </div>
         </div>

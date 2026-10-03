@@ -317,9 +317,9 @@ export default function ApprovedODLeavePage() {
                       <td style={{ fontWeight: 600, color: "var(--primary-400)", fontSize: 13 }}>{rec.rollNumber || "-"}</td>
                       <td style={{ fontSize: 13, color: "#e2e8f0" }}>{rec.registerNumber || "-"}</td>
                       <td style={{ fontWeight: 600, color: "#e2e8f0" }}>{rec.studentName || "-"}</td>
-                      {showExtendedCols && <td style={{ fontSize: 12, color: "var(--gray-400)" }}>{rec.year || "-"}</td>}
-                      {showExtendedCols && <td style={{ fontSize: 12, color: "var(--gray-400)" }}>{rec.section || "-"}</td>}
-                      {isDEO && <td style={{ fontSize: 12, color: "var(--gray-400)" }}>{rec.department || "-"}</td>}
+                      {showExtendedCols && <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{rec.year || "-"}</td>}
+                      {showExtendedCols && <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{rec.section || "-"}</td>}
+                      {isDEO && <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{rec.department || "-"}</td>}
                       <td>
                         <span style={{
                           display: "inline-flex", alignItems: "center", gap: 4,
@@ -331,8 +331,8 @@ export default function ApprovedODLeavePage() {
                           {isOD ? "🎫" : "📋"} {rec._type}
                         </span>
                       </td>
-                      <td style={{ fontSize: 13, color: "var(--gray-300)" }}>{formatDate(rec.fromDate)}</td>
-                      <td style={{ fontSize: 13, color: "var(--gray-300)" }}>{formatDate(rec.toDate)}</td>
+                      <td style={{ fontSize: 13, color: 'var(--text-primary)' }}>{formatDate(rec.fromDate)}</td>
+                      <td style={{ fontSize: 13, color: 'var(--text-primary)' }}>{formatDate(rec.toDate)}</td>
                       <td style={{ fontSize: 12, color: "var(--gray-500)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {isOD ? (rec.eventName || rec.odType || "-") : (rec.leaveType || "-")}
                       </td>
@@ -356,7 +356,7 @@ export default function ApprovedODLeavePage() {
               <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                 <span style={{ fontSize: 12, color: "var(--gray-500)" }}>OD:</span>
                 <button className="btn btn-secondary" style={{ fontSize: 12, padding: "3px 10px" }} disabled={odPage <= 1} onClick={() => setOdPage((p) => Math.max(1, p - 1))}>Prev</button>
-                <span style={{ fontSize: 12, color: "var(--gray-400)" }}>{odPage} / {odData?.totalPages}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{odPage} / {odData?.totalPages}</span>
                 <button className="btn btn-secondary" style={{ fontSize: 12, padding: "3px 10px" }} disabled={odPage >= (odData?.totalPages || 1)} onClick={() => setOdPage((p) => p + 1)}>Next</button>
               </div>
             )}
@@ -364,7 +364,7 @@ export default function ApprovedODLeavePage() {
               <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                 <span style={{ fontSize: 12, color: "var(--gray-500)" }}>Leave:</span>
                 <button className="btn btn-secondary" style={{ fontSize: 12, padding: "3px 10px" }} disabled={leavePage <= 1} onClick={() => setLeavePage((p) => Math.max(1, p - 1))}>Prev</button>
-                <span style={{ fontSize: 12, color: "var(--gray-400)" }}>{leavePage} / {leaveData?.totalPages}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{leavePage} / {leaveData?.totalPages}</span>
                 <button className="btn btn-secondary" style={{ fontSize: 12, padding: "3px 10px" }} disabled={leavePage >= (leaveData?.totalPages || 1)} onClick={() => setLeavePage((p) => p + 1)}>Next</button>
               </div>
             )}
@@ -373,7 +373,7 @@ export default function ApprovedODLeavePage() {
       </div>
 
       {(role === "faculty" || role === "advisor") && (
-        <div style={{ marginTop: 16, padding: "12px 16px", borderRadius: 10, background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", fontSize: 13, color: "var(--gray-400)" }}>
+        <div style={{ marginTop: 16, padding: "12px 16px", borderRadius: 10, background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", fontSize: 13, color: 'var(--text-secondary)' }}>
           <strong style={{ color: "var(--success)" }}>Attendance Integration:</strong>{" "}
           When marking attendance, students on approved OD or Leave for this date are automatically
           highlighted as <strong>OD - Approved</strong> or <strong>LEAVE - Approved</strong>.
@@ -485,7 +485,7 @@ export function StudentApprovedODLeave() {
                       <td style={{ fontSize: 13 }}>{formatDate(rec.fromDate)}</td>
                       <td style={{ fontSize: 13 }}>{formatDate(rec.toDate)}</td>
                       <td style={{ fontSize: 13 }}>{rec.numberOfDays || 1}</td>
-                      <td style={{ fontSize: 12, color: "var(--gray-400)" }}>
+                      <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                         {isOD ? (rec.eventName || rec.odType || "-") : (rec.leaveType || (rec.reason && rec.reason.slice(0, 40)) || "-")}
                       </td>
                       <td style={{ fontSize: 12, color: "var(--gray-500)" }}>
@@ -507,3 +507,5 @@ export function StudentApprovedODLeave() {
     </div>
   );
 }
+
+

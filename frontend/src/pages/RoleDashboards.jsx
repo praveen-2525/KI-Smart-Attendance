@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { reportsApi, odApi, leaveApi, correctionApi, usersApi } from '../services/api';
@@ -59,7 +59,7 @@ export function HODDashboard() {
   };
 
   const stats = [
-    { label: 'Total Students', value: overview?.total_students || 0, icon: '👥', color: 'var(--primary-400)' },
+    { label: 'Total Students', value: overview?.total_students || 0, icon: '👥', color: 'var(--secondary)' },
     { label: 'Pending OD', value: overview?.pending_od_requests || pendingOD?.requests?.length || 0, icon: '🎫', color: 'var(--warning)' },
     { label: 'Pending Leave', value: overview?.pending_leave_requests || pendingLeave?.requests?.length || 0, icon: '📋', color: 'var(--info)' },
     { label: 'Proof Pending', value: overview?.pending_proof_verification || 0, icon: '📎', color: 'var(--accent-violet)' },
@@ -70,8 +70,8 @@ export function HODDashboard() {
   return (
     <div className="page-content animate-fade-in">
       <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 800, color: '#e2e8f0' }}>🏛️ HOD Dashboard</h2>
-        <p style={{ color: 'var(--gray-500)', fontSize: 14 }}>Department overview, substitute approval & pending actions</p>
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)' }}>🏛️ HOD Dashboard</h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Department overview, substitute approval & pending actions</p>
       </div>
 
       <div className="grid-3 mb-6">
@@ -90,7 +90,7 @@ export function HODDashboard() {
         {/* Pending OD Requests */}
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0' }}>🎫 Pending OD Requests</h3>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>🎫 Pending OD Requests</h3>
             <button className="btn btn-secondary" style={{ fontSize: 12, padding: '4px 10px' }}
               onClick={() => navigate('/od')}>View All</button>
           </div>
@@ -99,23 +99,23 @@ export function HODDashboard() {
             const advStatus = od.advisorStatus || 'PENDING';
             return (
               <div key={id} style={{
-                background: 'var(--surface-dark-3)', borderRadius: 10,
+                background: 'var(--bg-body)', borderRadius: 10,
                 padding: '12px 14px', marginBottom: 10, borderLeft: '3px solid var(--warning)'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>{od.eventName || od.event_name}</div>
-                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, background: 'rgba(245,158,11,0.2)', color: 'var(--warning)', fontWeight: 600 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{od.eventName || od.event_name}</div>
+                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, background: 'var(--warning-bg)', color: 'var(--warning)', fontWeight: 600 }}>
                     HOD Action Required
                   </span>
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--gray-400)', marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
                   <strong>{od.studentName || od.student?.name}</strong> ({od.registerNumber || od.register_no}) • {od.department}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                   📅 {od.fromDate} → {od.toDate} ({od.numberOfDays || 1} Days)
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 6, borderTop: '1px solid var(--border-light)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                     Advisor: <span style={{ color: advStatus === 'APPROVED' ? 'var(--success)' : 'var(--warning)', fontWeight: 600 }}>{advStatus}</span>
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
@@ -141,7 +141,7 @@ export function HODDashboard() {
             );
           })}
           {!pendingOD?.requests?.length && (
-            <div style={{ color: 'var(--gray-600)', fontSize: 13, textAlign: 'center', padding: 20 }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: 13, textAlign: 'center', padding: 20 }}>
               ✅ No pending OD requests
             </div>
           )}
@@ -150,7 +150,7 @@ export function HODDashboard() {
         {/* Pending Leave Requests */}
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0' }}>📋 Pending Leave Requests</h3>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>📋 Pending Leave Requests</h3>
             <button className="btn btn-secondary" style={{ fontSize: 12, padding: '4px 10px' }}
               onClick={() => navigate('/leave')}>View All</button>
           </div>
@@ -159,25 +159,25 @@ export function HODDashboard() {
             const advStatus = lr.advisorStatus || 'PENDING';
             return (
               <div key={id} style={{
-                background: 'var(--surface-dark-3)', borderRadius: 10,
+                background: 'var(--bg-body)', borderRadius: 10,
                 padding: '12px 14px', marginBottom: 10, borderLeft: '3px solid var(--info)'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
                     {lr.leaveType || lr.leave_type} ({lr.numberOfDays || 1} day)
                   </div>
-                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, background: 'rgba(6,182,212,0.2)', color: 'var(--info)', fontWeight: 600 }}>
+                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, background: 'var(--info-bg)', color: 'var(--info)', fontWeight: 600 }}>
                     HOD Action Required
                   </span>
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--gray-400)', marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
                   <strong>{lr.studentName || lr.student?.name}</strong> ({lr.registerNumber}) • {lr.department}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                   📅 {lr.fromDate} → {lr.toDate}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 6, borderTop: '1px solid var(--border-light)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                     Advisor: <span style={{ color: advStatus === 'APPROVED' ? 'var(--success)' : 'var(--warning)', fontWeight: 600 }}>{advStatus}</span>
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
@@ -203,7 +203,7 @@ export function HODDashboard() {
             );
           })}
           {!pendingLeave?.requests?.length && (
-            <div style={{ color: 'var(--gray-600)', fontSize: 13, textAlign: 'center', padding: 20 }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: 13, textAlign: 'center', padding: 20 }}>
               ✅ No pending leave requests
             </div>
           )}
@@ -272,12 +272,12 @@ export function AdvisorDashboard() {
     <div className="page-content animate-fade-in">
       {/* Welcome banner */}
       <div style={{
-        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+        background: 'var(--primary-600)',
         borderRadius: 'var(--border-radius-xl)', padding: '24px 28px', marginBottom: 24
       }}>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>Welcome back, Advisor</div>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>Welcome back, Advisor</div>
         <h2 style={{ fontSize: 22, fontWeight: 800, color: 'white' }}>{user?.full_name}</h2>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
           {user?.department || 'CSE(AI&ML)'} •{' '}
           {totalPending > 0
             ? <span style={{ color: '#fde68a' }}>⚠️ {totalPending} pending action(s)</span>
@@ -301,20 +301,20 @@ export function AdvisorDashboard() {
       <div className="grid-2">
         {/* Pending OD Requests - with approve/reject */}
         <div className="card">
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginBottom: 16 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 16 }}>
             🎫 OD Requests — Action Required
           </h3>
           {pendingOD?.requests?.slice(0, 5).map((od) => {
             const id = od.id || od.requestId;
             return (
               <div key={id} style={{
-                background: 'var(--surface-dark-3)', borderRadius: 10,
+                background: 'var(--bg-body)', borderRadius: 10,
                 padding: '12px 14px', marginBottom: 10
               }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
                   {od.eventName || od.event_name}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--gray-400)', marginBottom: 4 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
                   {od.studentName || od.student?.name} • {od.fromDate || od.from_date} → {od.toDate || od.to_date}
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -348,24 +348,24 @@ export function AdvisorDashboard() {
 
         {/* Pending Leave Requests - with approve/reject */}
         <div className="card">
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginBottom: 16 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 16 }}>
             📋 Leave Requests — Action Required
           </h3>
           {pendingLeave?.requests?.slice(0, 5).map((lr) => {
             const id = lr.id || lr.requestId;
             return (
               <div key={id} style={{
-                background: 'var(--surface-dark-3)', borderRadius: 10,
+                background: 'var(--bg-body)', borderRadius: 10,
                 padding: '12px 14px', marginBottom: 10
               }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
                   {lr.leaveType || lr.leave_type}
-                  {lr.numberOfDays && <span style={{ color: 'var(--gray-500)', fontWeight: 400 }}> — {lr.numberOfDays} day(s)</span>}
+                  {lr.numberOfDays && <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> — {lr.numberOfDays} day(s)</span>}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--gray-400)', marginBottom: 4 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
                   {lr.studentName} • {lr.fromDate} → {lr.toDate}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--gray-600)', marginBottom: 8, fontStyle: 'italic' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8, fontStyle: 'italic' }}>
                   "{lr.reason?.slice(0, 80)}{lr.reason?.length > 80 ? '...' : ''}"
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -421,7 +421,7 @@ export function FacultyDashboard() {
   const stats = [
     { label: 'Pending Corrections', value: pendingCorrections?.corrections?.length || 0, icon: '✏️', color: 'var(--warning)' },
     { label: 'OD Requests', value: pendingOD?.requests?.length || 0, icon: '🎫', color: 'var(--success)' },
-    { label: "Today's Date", value: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }), icon: '📅', color: 'var(--primary-400)' },
+    { label: "Today's Date", value: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }), icon: '📅', color: 'var(--secondary)' },
     { label: 'Department', value: user?.department || 'AIML', icon: '🏛️', color: 'var(--info)' },
   ];
 
@@ -431,9 +431,9 @@ export function FacultyDashboard() {
         background: 'var(--gradient-brand)',
         borderRadius: 'var(--border-radius-xl)', padding: '24px 28px', marginBottom: 24
       }}>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>Welcome back</div>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>Welcome back</div>
         <h2 style={{ fontSize: 22, fontWeight: 800, color: 'white' }}>{user?.full_name}</h2>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
           {user?.designation || 'Faculty'} • {user?.department || 'CSE(AI&ML)'}
         </div>
       </div>
@@ -451,22 +451,22 @@ export function FacultyDashboard() {
       </div>
 
       <div className="card">
-        <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginBottom: 16 }}>✏️ Pending Correction Requests</h3>
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 16 }}>✏️ Pending Correction Requests</h3>
         {pendingCorrections?.corrections?.map((c) => (
           <div key={c.id} style={{
-            background: 'var(--surface-dark-3)', borderRadius: 8,
+            background: 'var(--bg-body)', borderRadius: 8,
             padding: '12px 14px', marginBottom: 8
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
                   {c.student_name || c.student?.name || 'Student'}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                   Marked: <span style={{ color: 'var(--danger)', fontWeight: 700 }}>{c.current_status || 'AB'}</span>
                   {' → '}Claims: <span style={{ color: 'var(--success)', fontWeight: 700 }}>{c.claimed_status}</span>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--gray-600)', marginTop: 4, fontStyle: 'italic' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4, fontStyle: 'italic' }}>
                   {c.explanation}
                 </div>
               </div>
@@ -630,16 +630,16 @@ export function DEODashboard() {
       {/* Header & Tabs */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <h2 style={{ fontSize: 24, fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <h2 style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 10 }}>
             <span>⚙️</span> DEO Dashboard
           </h2>
-          <p style={{ color: 'var(--gray-400)', fontSize: 14, marginTop: 2 }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginTop: 2 }}>
             Data Entry Officer Portal — Complete Student Registration & Management Control
           </p>
         </div>
 
         {/* Tab switcher */}
-        <div style={{ display: 'flex', background: 'var(--surface-dark-2)', borderRadius: 12, padding: 4, border: '1px solid var(--border-dark)' }}>
+        <div style={{ display: 'flex', background: 'var(--bg-surface)', borderRadius: 12, padding: 4, border: '1px solid var(--border)' }}>
           <button
             className={`btn btn-sm ${activeTab === 'overview' ? 'btn-primary' : 'btn-ghost'}`}
             onClick={() => setActiveTab('overview')}
@@ -669,7 +669,7 @@ export function DEODashboard() {
         <>
           <div className="grid-4 mb-6">
             {[
-              { label: 'Total Registered Students', value: studentsData?.total || '-', icon: '👥', color: 'var(--primary-400)' },
+              { label: 'Total Registered Students', value: studentsData?.total || '-', icon: '👥', color: 'var(--secondary)' },
               { label: 'Pending OD Requests', value: pendingOD?.requests?.length || 0, icon: '🎫', color: 'var(--warning)' },
               { label: 'Pending Leave Requests', value: pendingLeave?.requests?.length || 0, icon: '📋', color: 'var(--info)' },
               { label: 'Department', value: 'AIML', icon: '🏛️', color: 'var(--success)' },
@@ -685,7 +685,7 @@ export function DEODashboard() {
           </div>
 
           <div className="card mb-6">
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginBottom: 16 }}>⚡ Quick Actions</h3>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 16 }}>⚡ Quick Actions</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
               {quickActions.map((qa) => (
                 <div key={qa.label} className="quick-action" onClick={qa.action}>
@@ -702,7 +702,7 @@ export function DEODashboard() {
           {studentsData?.students?.length > 0 && (
             <div className="card">
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, alignItems: 'center' }}>
-                <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0' }}>👥 Recent Active Students</h3>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>👥 Recent Active Students</h3>
                 <button className="btn btn-secondary" style={{ fontSize: 12, padding: '4px 12px' }}
                   onClick={() => setActiveTab('students')}>View All Students →</button>
               </div>
@@ -721,9 +721,9 @@ export function DEODashboard() {
                   <tbody>
                     {studentsData.students.slice(0, 5).map((s) => (
                       <tr key={s.id || s.register_no}>
-                        <td style={{ fontWeight: 600, color: '#f8fafc' }}>{s.name}</td>
-                        <td style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--gray-400)' }}>{s.register_no}</td>
-                        <td style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--gray-400)' }}>{s.roll_number || '-'}</td>
+                        <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{s.name}</td>
+                        <td style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{s.register_no}</td>
+                        <td style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{s.roll_number || '-'}</td>
                         <td>{s.department}</td>
                         <td>{s.year} - {s.section}</td>
                         <td>
@@ -744,16 +744,16 @@ export function DEODashboard() {
       {/* TAB 2: STUDENT REGISTRATION (DEO ONLY) */}
       {activeTab === 'registration' && (
         <div className="card" style={{ maxWidth: 950, margin: '0 auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid var(--border-dark)', paddingBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid var(--border)', paddingBottom: 16 }}>
             <div>
-              <h3 style={{ fontSize: 20, fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h3 style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span>📝</span> DEO Student Registration
               </h3>
-              <p style={{ color: 'var(--gray-400)', fontSize: 13, marginTop: 4 }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>
                 Register new student accounts. Default login password will be set to the student's Date of Birth (DDMMYYYY).
               </p>
             </div>
-            <div style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--primary-400)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 20, padding: '4px 14px', fontSize: 12, fontWeight: 700 }}>
+            <div style={{ background: 'var(--info-bg)', color: 'var(--secondary)', border: '1px solid var(--border)', borderRadius: 20, padding: '4px 14px', fontSize: 12, fontWeight: 700 }}>
               DEO Controlled
             </div>
           </div>
@@ -834,7 +834,7 @@ export function DEODashboard() {
                   onChange={(e) => setRegForm({ ...regForm, date_of_birth: e.target.value })}
                   required
                 />
-                <span style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 4, display: 'block' }}>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, display: 'block' }}>
                   Used as default login password (Format: DDMMYYYY)
                 </span>
               </div>
@@ -1038,14 +1038,14 @@ export function DEODashboard() {
                   <tbody>
                     {studentsData?.students?.map((s, idx) => (
                       <tr key={s.id || s.register_no}>
-                        <td style={{ color: 'var(--gray-500)', fontSize: 12 }}>{(page - 1) * 15 + idx + 1}</td>
-                        <td style={{ fontWeight: 700, color: '#f8fafc' }}>{s.name}</td>
-                        <td style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--primary-400)' }}>{s.register_no}</td>
-                        <td style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--gray-400)' }}>{s.roll_number || '-'}</td>
+                        <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{(page - 1) * 15 + idx + 1}</td>
+                        <td style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{s.name}</td>
+                        <td style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--secondary)' }}>{s.register_no}</td>
+                        <td style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{s.roll_number || '-'}</td>
                         <td style={{ fontSize: 12 }}>{s.department}</td>
                         <td>{s.year}</td>
                         <td>{s.section}</td>
-                        <td style={{ fontSize: 12, color: 'var(--gray-400)' }}>{s.email}</td>
+                        <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{s.email}</td>
                         <td>
                           <span className={`badge badge-${s.status === 'ACTIVE' ? 'approved' : 'rejected'}`}>
                             {s.status || 'ACTIVE'}
@@ -1079,7 +1079,7 @@ export function DEODashboard() {
                     ))}
                     {!studentsData?.students?.length && (
                       <tr>
-                        <td colSpan={10} style={{ textAlign: 'center', color: 'var(--gray-500)', padding: 40 }}>
+                        <td colSpan={10} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>
                           No students registered matching criteria.
                         </td>
                       </tr>
@@ -1092,7 +1092,7 @@ export function DEODashboard() {
             {totalPages > 1 && (
               <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 16 }}>
                 <button className="btn btn-secondary" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Prev</button>
-                <span style={{ padding: '8px 16px', color: 'var(--gray-400)', fontSize: 13 }}>Page {page} of {totalPages}</span>
+                <span style={{ padding: '8px 16px', color: 'var(--text-secondary)', fontSize: 13 }}>Page {page} of {totalPages}</span>
                 <button className="btn btn-secondary" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>Next</button>
               </div>
             )}
@@ -1111,7 +1111,7 @@ export function DEODashboard() {
             <h3 style={{ fontSize: 18, fontWeight: 800, color: '#fca5a5', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
               <span>⚠️</span> Deactivate Student Account
             </h3>
-            <p style={{ color: 'var(--gray-400)', fontSize: 13, marginBottom: 16 }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 16 }}>
               You are deactivating <strong>{selectedStudentForDeactivate.name}</strong> ({selectedStudentForDeactivate.register_no}). The student will no longer be able to log in, but historical attendance, OD, and leave records will remain preserved.
             </p>
 
@@ -1151,3 +1151,4 @@ export function DEODashboard() {
     </div>
   );
 }
+
