@@ -1,0 +1,38 @@
+# ===== Environment / Secrets =====
+.env
+.env.*
+!.env.example
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+venv/
+.venv/
+env/
+.env/
+
+# ===== Node / Frontend =====
+node_modules/
+dist/
+.next/
+out/
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+
+# ===== IDE =====
+.vscode/
+.idea/
+
+# ===== Uploads / generated =====
+backend/uploads/
+*.log
