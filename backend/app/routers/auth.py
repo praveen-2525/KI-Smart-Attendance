@@ -65,6 +65,12 @@ class PasswordResetRequest(BaseModel):
 class FCMTokenUpdate(BaseModel):
     fcm_token: str
 
+class StudentProfileUpdate(BaseModel):
+    department: Optional[str] = None
+    year: Optional[str] = None
+    section: Optional[str] = None
+    email: Optional[str] = None
+
 @router.post("/verify-student")
 async def verify_student(
     data: VerifyStudentRequest,
@@ -513,3 +519,32 @@ async def update_fcm_token(
             {"$set": {"fcm_token": data.fcm_token}}
         )
     return {"message": "FCM token updated"}
+
+@router.put("/profile")
+async def update_profile(
+    data: StudentProfileUpdate,
+    current_user: models.User = Depends(get_current_user),
+    mongo_db = Depends(get_db)
+):
+    if "STUDENT" not in str(current_user.role).upper():
+        raise HTTPException(status_code=403, detail="Only students can update profile")
+    
+    update_data = {}
+    if data.department: update_data["department"] = data.department
+    if data.year: update_data["year"] = data.year
+    if data.section: update_data["section"] = data.section
+    if data.email: update_data["email"] = data.email
+    
+    if not update_data:
+        return {"message": "No data provided to update"}
+        
+    result = await mongo_db["student_accounts"].update_one(
+        {"$or": [{"register_no": current_user.login_id}, {"roll_number": current_user.login_id}]},
+        {"$set": update_data}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Student profile not found")
+        
+    return {"message": "Profile updated successfully"}
+

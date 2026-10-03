@@ -64,6 +64,7 @@ export const authApi = {
   getMe: () => api.get('/auth/me'),
   changePassword: (currentPassword, newPassword) =>
     api.post('/auth/change-password', { current_password: currentPassword, new_password: newPassword }),
+  updateProfile: (data) => api.put('/auth/profile', data),
 };
 
 // Attendance APIs
