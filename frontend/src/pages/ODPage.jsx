@@ -1,8 +1,23 @@
-﻿import { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { odApi, API_BASE_URL } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
+
+// Two-stage OD workflow statuses (kept in sync with the backend)
+export const OD_STATUS_PENDING = 'Pending Approval';
+export const OD_STATUS_AWAITING_PROOF = 'Approved – Awaiting Completion Proof';
+export const OD_STATUS_FINAL = 'Fulfilled / Final Approved';
+export const OD_STUDENT_AWAITING_LABEL = 'Approved – Submit Completion Proof';
+export const COMPLETION_PENDING = 'Completion Proof Pending Verification';
+
+const REVIEW_TABS = [
+  { key: 'pending', label: 'Pending OD Requests' },
+  { key: 'approved', label: 'Approved OD Requests' },
+  { key: 'completion', label: 'OD Completion Verification' },
+  { key: 'completed', label: 'Completed OD' },
+  { key: 'rejected', label: 'Rejected' },
+];
 
 export default function ODPage() {
   const { user } = useAuth();
@@ -10,8 +25,21 @@ export default function ODPage() {
   const isReviewer = ['advisor', 'hod', 'deo'].includes(user?.role);
   const qc = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState(isStudent ? 'form' : 'my-requests'); // 'form' | 'my-requests'
+  const [activeTab, setActiveTab] = useState(isStudent ? 'form' : 'pending'); // student: 'form' | 'my-requests'; reviewer: workflow tab
   const [selectedRequest, setSelectedRequest] = useState(null);
+
+  // Stage-2 completion proof submission (student)
+  const [proofRequest, setProofRequest] = useState(null);
+  const [proofForm, setProofForm] = useState({
+    proofType: 'CERTIFICATE',
+    latitude: '',
+    longitude: '',
+    locationAddress: '',
+    remarks: '',
+  });
+  const [proofFile, setProofFile] = useState(null);
+  const [proofErrors, setProofErrors] = useState({});
+  const [capturingLocation, setCapturingLocation] = useState(false);
 
   // Form state
   const [form, setForm] = useState({
@@ -66,9 +94,13 @@ export default function ODPage() {
     select: (res) => res.data,
   });
 
-  const { data: pendingODData, isLoading: loadingPending } = useQuery({
-    queryKey: ['od-pending'],
-    queryFn: () => odApi.getPending(),
+  // Reviewer workflow tabs: pending | approved | completion | completed | rejected
+  const { data: reviewData, isLoading: loadingReview } = useQuery({
+    queryKey: ['od-review-tab', activeTab],
+    queryFn: () =>
+      activeTab === 'completion'
+        ? odApi.getCompletionPending()
+        : odApi.getPending({ tab: activeTab }),
     enabled: isReviewer,
     select: (res) => res.data,
   });
@@ -76,12 +108,43 @@ export default function ODPage() {
   const reviewMutation = useMutation({
     mutationFn: ({ id, status, remarks }) => odApi.review(id, status, remarks),
     onSuccess: (res, vars) => {
-      toast.success(`OD request ${vars.status.toLowerCase()} successfully!`);
+      toast.success(res?.data?.message || `OD request ${vars.status.toLowerCase()} successfully.`);
+      qc.invalidateQueries(['od-review-tab']);
       qc.invalidateQueries(['od-pending']);
+      qc.invalidateQueries(['od-my']);
       setSelectedRequest(null);
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || 'Failed to update OD request');
+    }
+  });
+
+  // Stage-2: Advisor/HOD verifies the completion proof
+  const completionMutation = useMutation({
+    mutationFn: ({ id, status, remarks }) => odApi.reviewCompletion(id, status, remarks),
+    onSuccess: (res) => {
+      toast.success(res?.data?.message || 'Completion proof verified successfully.');
+      qc.invalidateQueries(['od-review-tab']);
+      qc.invalidateQueries(['od-pending']);
+      qc.invalidateQueries(['od-my']);
+      setSelectedRequest(null);
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.detail || 'Failed to verify completion proof');
+    }
+  });
+
+  // Stage-2: student submits certificate / geo-tagged photo
+  const proofMutation = useMutation({
+    mutationFn: ({ id, formData }) => odApi.submitCompletionProof(id, formData),
+    onSuccess: (res) => {
+      toast.success(res?.data?.message || 'Completion proof submitted successfully. Awaiting verification.');
+      qc.invalidateQueries(['od-my']);
+      closeProofModal();
+    },
+    onError: (err) => {
+      const detail = err.response?.data?.detail;
+      toast.error(typeof detail === 'string' ? detail : 'Unable to submit completion proof right now. Please try again.');
     }
   });
 
@@ -215,18 +278,114 @@ export default function ODPage() {
     toast('Form reset successfully', { icon: '🧹' });
   };
 
-  const requestsList = isStudent ? (myODData?.requests || []) : (pendingODData?.requests || []);
+  const requestsList = isStudent ? (myODData?.requests || []) : (reviewData?.requests || []);
 
-  const getStatusBadge = (status) => {
+  // ---- Stage-2 completion proof helpers (student) ----
+  const canSubmitProof = (req) =>
+    req?.status === OD_STATUS_AWAITING_PROOF &&
+    req?.completionStatus !== COMPLETION_PENDING &&
+    req?.completionStatus !== 'Approved';
+
+  const openProofModal = (req) => {
+    setProofRequest(req);
+    setProofForm({ proofType: 'CERTIFICATE', latitude: '', longitude: '', locationAddress: '', remarks: '' });
+    setProofFile(null);
+    setProofErrors({});
+  };
+
+  const closeProofModal = () => {
+    setProofRequest(null);
+    setProofFile(null);
+    setProofErrors({});
+  };
+
+  const captureGeoLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by this browser. Enter the location manually.');
+      return;
+    }
+    setCapturingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setProofForm((f) => ({
+          ...f,
+          latitude: String(pos.coords.latitude.toFixed(6)),
+          longitude: String(pos.coords.longitude.toFixed(6)),
+        }));
+        setCapturingLocation(false);
+        toast.success('Location captured successfully.');
+      },
+      () => {
+        setCapturingLocation(false);
+        toast.error('Could not capture location. Please enter it manually.');
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  const handleProofSubmit = (e) => {
+    e.preventDefault();
+    const errs = {};
+    if (!proofFile) {
+      errs.file = proofForm.proofType === 'CERTIFICATE'
+        ? 'Certificate file is required'
+        : 'Geo-tagged event photo is required';
+    }
+    if (proofForm.proofType === 'GEO_TAGGED_PHOTO' && proofFile) {
+      const ext = (proofFile.name.split('.').pop() || '').toLowerCase();
+      if (!['jpg', 'jpeg', 'png'].includes(ext)) {
+        errs.file = 'Geo-tagged photo must be a JPG or PNG image';
+      }
+    }
+    if (proofForm.proofType === 'CERTIFICATE' && proofFile) {
+      const ext = (proofFile.name.split('.').pop() || '').toLowerCase();
+      if (!['pdf', 'jpg', 'jpeg', 'png'].includes(ext)) {
+        errs.file = 'Certificate must be a PDF, JPG or PNG file';
+      }
+    }
+    setProofErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
+    const fd = new FormData();
+    fd.append('proofType', proofForm.proofType);
+    fd.append('proof', proofFile);
+    fd.append('latitude', proofForm.latitude || '');
+    fd.append('longitude', proofForm.longitude || '');
+    fd.append('locationAddress', proofForm.locationAddress || '');
+    fd.append('remarks', proofForm.remarks || '');
+    proofMutation.mutate({ id: proofRequest.requestId || proofRequest.id, formData: fd });
+  };
+
+  const getStatusBadge = (status, forStudent = false) => {
     switch (status) {
       case 'Approved':
-        return <span className="badge badge-approved">✅ Approved</span>;
+      case OD_STATUS_AWAITING_PROOF:
+        return (
+          <span className="badge badge-approved">
+            {forStudent ? OD_STUDENT_AWAITING_LABEL : 'Approved – Awaiting Completion Proof'}
+          </span>
+        );
+      case OD_STATUS_FINAL:
+        return <span className="badge badge-approved">✓ OD Confirmed</span>;
       case 'Rejected':
         return <span className="badge badge-rejected">❌ Rejected</span>;
       case 'Cancelled':
         return <span className="badge" style={{ background: 'rgba(148,163,184,0.15)', color: 'var(--text-secondary)' }}>🚫 Cancelled</span>;
       default:
-        return <span className="badge badge-pending">⏳ Pending</span>;
+        return <span className="badge badge-pending">⏳ Pending Approval</span>;
+    }
+  };
+
+  const getCompletionBadge = (completionStatus) => {
+    switch (completionStatus) {
+      case COMPLETION_PENDING:
+        return <span className="badge badge-pending">Proof Pending Verification</span>;
+      case 'Approved':
+        return <span className="badge badge-approved">Proof Verified</span>;
+      case 'Rejected':
+        return <span className="badge badge-rejected">Proof Rejected</span>;
+      default:
+        return null;
     }
   };
 
@@ -257,9 +416,9 @@ export default function ODPage() {
           </p>
         </div>
 
-        {/* Tab switcher */}
-        <div style={{ display: 'flex', background: 'var(--bg-surface)', borderRadius: 12, padding: 4, border: '1px solid var(--border)' }}>
-          {isStudent && (
+        {/* Student tab switcher */}
+        {isStudent && (
+          <div style={{ display: 'flex', background: 'var(--bg-surface)', borderRadius: 12, padding: 4, border: '1px solid var(--border)' }}>
             <button
               className={`btn btn-sm ${activeTab === 'form' ? 'btn-primary' : 'btn-ghost'}`}
               onClick={() => setActiveTab('form')}
@@ -267,16 +426,35 @@ export default function ODPage() {
             >
               ✏️ New OD Request
             </button>
-          )}
-          <button
-            className={`btn btn-sm ${activeTab === 'my-requests' || !isStudent ? 'btn-primary' : 'btn-ghost'}`}
-            onClick={() => setActiveTab('my-requests')}
-            style={{ borderRadius: 8, padding: '6px 16px', fontSize: 13 }}
-          >
-            📂 {isStudent ? 'My Requests' : 'Pending Requests'} ({requestsList.length})
-          </button>
-        </div>
+            <button
+              className={`btn btn-sm ${activeTab === 'my-requests' ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setActiveTab('my-requests')}
+              style={{ borderRadius: 8, padding: '6px 16px', fontSize: 13 }}
+            >
+              📂 My Requests ({requestsList.length})
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Advisor/HOD/DEO workflow tabs */}
+      {isReviewer && (
+        <div style={{
+          display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap',
+          borderBottom: '1px solid var(--border)', paddingBottom: 10
+        }}>
+          {REVIEW_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              className={`btn btn-sm ${activeTab === tab.key ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveTab(tab.key)}
+              style={{ fontSize: 13, padding: '6px 14px' }}
+            >
+              {tab.label}{activeTab === tab.key ? ` (${requestsList.length})` : ''}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Profile missing alert */}
       {isStudent && missingProfileFields.length > 0 && (
@@ -619,15 +797,37 @@ export default function ODPage() {
         </div>
       )}
 
-      {/* MY REQUESTS / PENDING TAB */}
-      {activeTab === 'my-requests' && (
+      {/* MY REQUESTS / REVIEWER WORKFLOW TABS */}
+      {(activeTab === 'my-requests' || isReviewer) && (
         <div>
+          {/* Student banner: OD approved, awaiting completion proof (two-stage workflow) */}
+          {isStudent && activeTab === 'my-requests' && requestsList.some((r) => canSubmitProof(r)) && (
+            <div className="card mb-4" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.35)' }}>
+              <div className="card-body" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--success)', marginBottom: 4 }}>
+                    ✅ OD Request Approved
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                    Your OD request has been approved. After completing the event, submit the required certificate or geo-tagged photo for final verification.
+                  </div>
+                </div>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => openProofModal(requestsList.find((r) => canSubmitProof(r)))}
+                >
+                  📎 Submit Completion Proof
+                </button>
+              </div>
+            </div>
+          )}
+
           {requestsList.length === 0 ? (
             <div className="card text-center" style={{ padding: '40px 20px' }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>🎫</div>
               <h3 style={{ fontSize: 18, color: 'var(--text-primary)', fontWeight: 700 }}>No OD Requests Found</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: 14, marginTop: 4 }}>
-                {isStudent ? 'You have not submitted any OD requests yet.' : 'No pending OD applications to review.'}
+                {isStudent ? 'You have not submitted any OD requests yet.' : 'No OD applications in this view.'}
               </p>
               {isStudent && (
                 <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setActiveTab('form')}>
@@ -675,19 +875,62 @@ export default function ODPage() {
                           📍 {req.location} ({req.organization})
                         </td>
                         <td style={{ padding: '14px 16px' }}>
-                          {getStatusBadge(req.status)}
+                          {getStatusBadge(req.status, isStudent)}
+                          {isStudent && getCompletionBadge(req.completionStatus) && (
+                            <div style={{ marginTop: 4 }}>{getCompletionBadge(req.completionStatus)}</div>
+                          )}
                         </td>
                         <td style={{ padding: '14px 16px', color: 'var(--text-muted)', fontSize: 12 }}>
                           {req.submittedAt ? new Date(req.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
                         </td>
                         <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => setSelectedRequest(req)}
-                            style={{ color: 'var(--secondary)' }}
-                          >
-                            👁️ Details
-                          </button>
+                          {isReviewer && req.completionStatus === COMPLETION_PENDING ? (
+                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => setSelectedRequest(req)}
+                              >
+                                📄 View Proof
+                              </button>
+                              <button
+                                className="btn btn-success btn-sm"
+                                disabled={completionMutation.isLoading}
+                                onClick={() => completionMutation.mutate({ id: req.requestId || req.id, status: 'Approved', remarks: '' })}
+                              >
+                                ✅ Approve
+                              </button>
+                              <button
+                                className="btn btn-danger btn-sm"
+                                disabled={completionMutation.isLoading}
+                                onClick={() => {
+                                  const remarks = prompt('Reason for rejecting the completion proof:');
+                                  if (remarks !== null) {
+                                    completionMutation.mutate({ id: req.requestId || req.id, status: 'Rejected', remarks });
+                                  }
+                                }}
+                              >
+                                ❌ Reject
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                              {isStudent && canSubmitProof(req) && (
+                                <button
+                                  className="btn btn-primary btn-sm"
+                                  onClick={() => openProofModal(req)}
+                                >
+                                  📎 Submit Completion Proof
+                                </button>
+                              )}
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => setSelectedRequest(req)}
+                                style={{ color: 'var(--secondary)' }}
+                              >
+                                👁️ Details
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -832,8 +1075,46 @@ export default function ODPage() {
                 </div>
               )}
 
-              {/* Reviewer Action Buttons */}
-              {isReviewer && selectedRequest.status === 'Pending' && (
+              {/* Completion Proof section (Stage 2) */}
+              {selectedRequest.completionStatus && (
+                <div style={{ background: 'var(--bg-body)', padding: 12, borderRadius: 8, fontSize: 13 }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 700, display: 'block', marginBottom: 8 }}>
+                    📎 OD Completion Proof (Stage 2)
+                  </span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface-dark-4)', padding: '8px 10px', borderRadius: 6 }}>
+                    <span>
+                      <strong>{selectedRequest.proofType === 'GEO_TAGGED_PHOTO' ? '📷 Geo-tagged Event Photo' : '📄 Certificate'}</strong>
+                      {selectedRequest.geoLocation?.latitude && (
+                        <span style={{ color: 'var(--text-muted)', fontSize: 12, display: 'block' }}>
+                          📍 {selectedRequest.geoLocation.latitude}, {selectedRequest.geoLocation.longitude}
+                          {selectedRequest.geoLocation.address ? ` — ${selectedRequest.geoLocation.address}` : ''}
+                        </span>
+                      )}
+                      {selectedRequest.completionSubmittedAt && (
+                        <span style={{ color: 'var(--text-muted)', fontSize: 12, display: 'block' }}>
+                          Submitted: {new Date(selectedRequest.completionSubmittedAt).toLocaleString('en-IN')}
+                        </span>
+                      )}
+                    </span>
+                    {selectedRequest.proofUrl ? (
+                      <a
+                        href={`${API_BASE_URL}${selectedRequest.proofUrl}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-sm btn-secondary"
+                      >
+                        View Proof ↗
+                      </a>
+                    ) : (
+                      <span className="badge badge-pending">Not submitted</span>
+                    )}
+                  </div>
+                  <div style={{ marginTop: 8 }}>{getCompletionBadge(selectedRequest.completionStatus)}</div>
+                </div>
+              )}
+
+              {/* Reviewer Action Buttons - Stage 1 (Pending Approval) */}
+              {isReviewer && (selectedRequest.status === OD_STATUS_PENDING || selectedRequest.status === 'Pending') && (
                 <div style={{ display: 'flex', gap: 10, marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-dark)' }}>
                   <button
                     className="btn btn-success"
@@ -850,7 +1131,7 @@ export default function ODPage() {
                     style={{ flex: 1 }}
                     onClick={() => {
                       const remarks = prompt('Reason for rejection:');
-                      if (remarks) {
+                      if (remarks !== null) {
                         reviewMutation.mutate({ id: selectedRequest.requestId || selectedRequest.id, status: 'Rejected', remarks });
                       }
                     }}
@@ -859,7 +1140,211 @@ export default function ODPage() {
                   </button>
                 </div>
               )}
+
+              {/* Reviewer Action Buttons - Stage 2 (Completion proof pending verification) */}
+              {isReviewer && selectedRequest.completionStatus === COMPLETION_PENDING && (
+                <div style={{ display: 'flex', gap: 10, marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-dark)' }}>
+                  <button
+                    className="btn btn-success"
+                    style={{ flex: 1 }}
+                    disabled={completionMutation.isLoading}
+                    onClick={() => completionMutation.mutate({ id: selectedRequest.requestId || selectedRequest.id, status: 'Approved', remarks: '' })}
+                  >
+                    ✅ Approve Completion Proof
+                  </button>
+                  <button
+                    className="btn btn-danger"
+                    style={{ flex: 1 }}
+                    disabled={completionMutation.isLoading}
+                    onClick={() => {
+                      const remarks = prompt('Reason for rejecting the completion proof:');
+                      if (remarks !== null) {
+                        completionMutation.mutate({ id: selectedRequest.requestId || selectedRequest.id, status: 'Rejected', remarks });
+                      }
+                    }}
+                  >
+                    ❌ Reject Completion Proof
+                  </button>
+                </div>
+              )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* STAGE-2: OD COMPLETION PROOF SUBMISSION MODAL (STUDENT) */}
+      {proofRequest && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: 620 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                📎 OD Completion Proof ({proofRequest.requestId || proofRequest.id})
+              </h3>
+              <button className="btn btn-ghost btn-sm" onClick={closeProofModal}>✕</button>
+            </div>
+
+            {/* Original OD request context */}
+            <div style={{ background: 'var(--bg-body)', padding: 14, borderRadius: 10, fontSize: 13, marginBottom: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: 11 }}>Original OD Request ID</span>
+                <strong style={{ color: 'var(--secondary)' }}>{proofRequest.requestId || proofRequest.id}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: 11 }}>Student ID</span>
+                <strong>{proofRequest.studentId || user?.id || 'N/A'}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: 11 }}>Student Name</span>
+                <strong>{proofRequest.studentName || user?.full_name}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: 11 }}>Register Number</span>
+                <strong>{proofRequest.registerNumber || user?.register_number || user?.login_id}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: 11 }}>Event Name</span>
+                <strong>{proofRequest.eventName}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: 11 }}>Event Date</span>
+                <strong>{proofRequest.fromDate}{proofRequest.toDate && proofRequest.toDate !== proofRequest.fromDate ? ` → ${proofRequest.toDate}` : ''}</strong>
+              </div>
+            </div>
+
+            <form onSubmit={handleProofSubmit}>
+              {/* Proof type selector: Option A certificate / Option B geo-tagged photo */}
+              <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+                <label style={{
+                  flex: 1, border: proofForm.proofType === 'CERTIFICATE' ? '2px solid var(--primary-500)' : '1px solid var(--border)',
+                  borderRadius: 10, padding: 12, cursor: 'pointer', textAlign: 'center'
+                }}>
+                  <input
+                    type="radio"
+                    name="proofType"
+                    checked={proofForm.proofType === 'CERTIFICATE'}
+                    onChange={() => setProofForm({ ...proofForm, proofType: 'CERTIFICATE' })}
+                    style={{ display: 'none' }}
+                  />
+                  <div style={{ fontSize: 22, marginBottom: 4 }}>📄</div>
+                  <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>Option A: Certificate</strong>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>PDF, JPG or PNG (Max 10MB)</div>
+                </label>
+                <label style={{
+                  flex: 1, border: proofForm.proofType === 'GEO_TAGGED_PHOTO' ? '2px solid var(--primary-500)' : '1px solid var(--border)',
+                  borderRadius: 10, padding: 12, cursor: 'pointer', textAlign: 'center'
+                }}>
+                  <input
+                    type="radio"
+                    name="proofType"
+                    checked={proofForm.proofType === 'GEO_TAGGED_PHOTO'}
+                    onChange={() => setProofForm({ ...proofForm, proofType: 'GEO_TAGGED_PHOTO' })}
+                    style={{ display: 'none' }}
+                  />
+                  <div style={{ fontSize: 22, marginBottom: 4 }}>📷</div>
+                  <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>Option B: Geo-tagged Photo</strong>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>JPG or PNG image with location</div>
+                </label>
+              </div>
+
+              {/* File upload */}
+              <div className="form-group">
+                <label className="form-label">
+                  {proofForm.proofType === 'CERTIFICATE' ? 'Certificate File *' : 'Geo-tagged Event Photo *'}
+                </label>
+                <div style={{
+                  border: proofErrors.file ? '2px dashed var(--danger)' : '2px dashed var(--border-dark)',
+                  borderRadius: 10, padding: 16, textAlign: 'center',
+                  background: proofFile ? 'rgba(16,185,129,0.05)' : 'var(--surface-dark-3)',
+                  cursor: 'pointer'
+                }} onClick={() => document.getElementById('od-proof-upload').click()}>
+                  <input
+                    id="od-proof-upload"
+                    type="file"
+                    accept={proofForm.proofType === 'CERTIFICATE' ? '.pdf,image/jpeg,image/png,image/jpg' : 'image/jpeg,image/png,image/jpg'}
+                    style={{ display: 'none' }}
+                    onChange={(e) => setProofFile(e.target.files[0])}
+                  />
+                  {proofFile ? (
+                    <div style={{ color: 'var(--success)', fontWeight: 600, fontSize: 14 }}>
+                      📄 Selected: {proofFile.name} ({(proofFile.size / 1024 / 1024).toFixed(2)} MB)
+                    </div>
+                  ) : (
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+                      📎 Click to upload your {proofForm.proofType === 'CERTIFICATE' ? 'completion certificate' : 'geo-tagged event photo'}<br />
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        {proofForm.proofType === 'CERTIFICATE' ? 'Allowed: PDF, JPG, PNG (Max 10MB)' : 'Allowed: JPG, PNG (Max 10MB)'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {proofErrors.file && <div style={{ color: 'var(--danger)', fontSize: 12, marginTop: 4 }}>{proofErrors.file}</div>}
+              </div>
+
+              {/* Geo location fields (geo-tagged photo only) */}
+              {proofForm.proofType === 'GEO_TAGGED_PHOTO' && (
+                <div style={{ background: 'var(--bg-body)', borderRadius: 10, padding: 14, marginBottom: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>📍 Location Information</strong>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={captureGeoLocation}
+                      disabled={capturingLocation}
+                    >
+                      {capturingLocation ? <><span className="spinner" style={{ width: 12, height: 12 }} /> Capturing...</> : '📍 Capture Current Location'}
+                    </button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <input
+                      className="form-input"
+                      placeholder="Latitude"
+                      value={proofForm.latitude}
+                      onChange={(e) => setProofForm({ ...proofForm, latitude: e.target.value })}
+                    />
+                    <input
+                      className="form-input"
+                      placeholder="Longitude"
+                      value={proofForm.longitude}
+                      onChange={(e) => setProofForm({ ...proofForm, longitude: e.target.value })}
+                    />
+                    <input
+                      className="form-input"
+                      style={{ gridColumn: 'span 2' }}
+                      placeholder="Location address (e.g. Venue name, City)"
+                      value={proofForm.locationAddress}
+                      onChange={(e) => setProofForm({ ...proofForm, locationAddress: e.target.value })}
+                    />
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+                    Location information is stored with the proof for verification when geo-tagged photo is used.
+                  </div>
+ </div>
+              )}
+
+              {/* Remarks */}
+              <div className="form-group">
+                <label className="form-label">Remarks (Optional)</label>
+                <input
+                  className="form-input"
+                  placeholder="Any additional details about the proof..."
+                  value={proofForm.remarks}
+                  onChange={(e) => setProofForm({ ...proofForm, remarks: e.target.value })}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 8 }}>
+                <button type="button" className="btn btn-secondary" onClick={closeProofModal} disabled={proofMutation.isLoading}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={proofMutation.isLoading}>
+                  {proofMutation.isLoading ? (
+                    <><span className="spinner" style={{ width: 14, height: 14, borderRightColor: 'transparent' }} /> Submitting...</>
+                  ) : (
+                    '📤 Submit Completion Proof'
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

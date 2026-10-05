@@ -95,6 +95,20 @@ export const odApi = {
     if (reviewerRemarks) fd.append('reviewerRemarks', reviewerRemarks);
     return api.post(`/od-requests/${odId}/review`, fd);
   },
+  // Stage 2 - OD completion proof (student submits certificate / geo-tagged photo)
+  submitCompletionProof: (odId, formData) =>
+    api.post(`/od-requests/${odId}/completion-proof`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  // Stage 2 - Advisor/HOD verification of completion proof
+  reviewCompletion: (odId, status, reviewerRemarks) => {
+    const fd = new FormData();
+    fd.append('status', status);
+    if (reviewerRemarks) fd.append('reviewerRemarks', reviewerRemarks);
+    return api.post(`/od-requests/${odId}/completion-review`, fd);
+  },
+  // Advisor/HOD "OD Completion Verification" list
+  getCompletionPending: (params) => api.get('/od-requests/completion-pending', { params }),
 };
 
 // Leave APIs
@@ -111,12 +125,6 @@ export const leaveApi = {
     if (reviewerRemarks) fd.append('reviewerRemarks', reviewerRemarks);
     return api.post(`/leave-requests/${leaveId}/review`, fd);
   },
-};
-
-// Late Arrival APIs
-export const lateApi = {
-  inform: (formData) => api.post('/late/inform', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
-  getMy: () => api.get('/late/my'),
 };
 
 // Correction APIs

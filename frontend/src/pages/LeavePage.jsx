@@ -1,4 +1,4 @@
-﻿import { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leaveApi, API_BASE_URL } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -68,9 +68,11 @@ export default function LeavePage() {
 
   const reviewMutation = useMutation({
     mutationFn: ({ id, status, remarks }) => leaveApi.review(id, status, remarks),
-    onSuccess: (res, vars) => {
-      toast.success(`Leave request ${vars.status.toLowerCase()} successfully!`);
+    onSuccess: (res) => {
+      // Surface the backend's confirmation verbatim: "Leave request approved successfully."
+      toast.success(res?.data?.message || 'Leave request updated successfully.');
       qc.invalidateQueries(['leave-pending']);
+      qc.invalidateQueries(['leave-my']);
       setSelectedRequest(null);
     },
     onError: (err) => {
@@ -305,7 +307,7 @@ export default function LeavePage() {
                   value={form.fromDate}
                   onChange={(e) => {
                     setForm({ ...form, fromDate: e.target.value });
-                    if (errors.fromDate) setErrors({ ...errors, fromDate: None });
+                    if (errors.fromDate) setErrors({ ...errors, fromDate: undefined });
                   }}
                   required
                 />

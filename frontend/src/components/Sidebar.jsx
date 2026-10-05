@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 // Icons (using emoji + SVG)
 const Icons = {
   home: '🏠', attendance: '📊', planner: '🎯', od: '🎫', leave: '📋',
-  late: '⏰', correction: '✏️', notifications: '🔔', timetable: '📅',
+  correction: '✏️', notifications: '🔔', timetable: '📅',
   reports: '📄', students: '👥', faculty: '👨‍🏫', settings: '⚙️',
   audit: '🔍', qr: '📱', erp: '🔗', logout: '🚪',
   classes: '🏛️', requests: '📨', alerts: '⚠️',
@@ -18,7 +18,6 @@ const navConfig = {
     { label: 'Requests', section: true },
     { path: '/od', label: 'OD Request', icon: Icons.od },
     { path: '/leave', label: 'Leave Request', icon: Icons.leave },
-    { path: '/late', label: 'Late Arrival', icon: Icons.late },
     { path: '/correction', label: 'Correction', icon: Icons.correction },
     { label: 'Records', section: true },
     { path: '/my-requests', label: 'My Requests', icon: Icons.requests },

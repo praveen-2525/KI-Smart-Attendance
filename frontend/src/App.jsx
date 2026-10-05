@@ -16,7 +16,7 @@ import AttendancePage from './pages/AttendancePage';
 import PlannerPage from './pages/PlannerPage';
 import ODPage from './pages/ODPage';
 import LeavePage from './pages/LeavePage';
-import { LateArrivalPage, CorrectionPage } from './pages/RequestPages';
+import { CorrectionPage } from './pages/RequestPages';
 import { HODDashboard, FacultyDashboard, DEODashboard, AdvisorDashboard } from './pages/RoleDashboards';
 import { ReportsPage, AuditPage, ERPPage, SettingsPage } from './pages/AdminPages';
 import ChangePasswordPage from './pages/ChangePasswordPage';
@@ -47,7 +47,6 @@ const PAGE_TITLES = {
   '/planner': 'Smart Planner',
   '/od': 'OD Requests',
   '/leave': 'Leave Requests',
-  '/late': 'Late Arrival',
   '/correction': 'Attendance Correction',
   '/notifications': 'Notifications',
   '/timetable': 'Timetable',
@@ -115,7 +114,6 @@ function AppLayout() {
             <Route path="/leave" element={
               ['faculty', 'staff'].includes(user?.role) ? <Navigate to="/approved-od-leave" replace /> : <LeavePage />
             } />
-            <Route path="/late" element={<LateArrivalPage />} />
             <Route path="/correction" element={<CorrectionPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/audit" element={<AuditPage />} />
