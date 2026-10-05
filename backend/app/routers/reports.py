@@ -150,10 +150,12 @@ async def hod_overview(
 ):
     """HOD dashboard overview statistics from MongoDB."""
     total_students = await mongo_db["student_accounts"].count_documents({"status": "ACTIVE"})
-    pending_od = await mongo_db["od_requests"].count_documents({"status": "Pending"})
+    pending_od = await mongo_db["od_requests"].count_documents({"status": {"$in": ["Pending", "Pending Approval"]}})
     pending_leave = await mongo_db["leave_requests"].count_documents({"status": "Pending"})
     pending_corrections = await mongo_db["attendance_corrections"].count_documents({"status": "pending"})
-    pending_proof = await mongo_db["od_requests"].count_documents({"status": "ProofSubmitted"})
+    pending_proof = await mongo_db["od_requests"].count_documents({
+        "completionStatus": "Completion Proof Pending Verification"
+    })
 
     return {
         "total_students": total_students,

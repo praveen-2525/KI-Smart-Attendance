@@ -721,8 +721,7 @@ async def get_od_leave_status_for_date(
 
     q_filter = {
         "fromDate": {"$lte": target_date},
-        "toDate": {"$gte": target_date},
-        "status": "Approved"
+        "toDate": {"$gte": target_date}
     }
 
     if department:
@@ -732,12 +731,20 @@ async def get_od_leave_status_for_date(
     if section:
         q_filter["section"] = section
 
-    od_records = await mongo_db["od_requests"].find(q_filter, {
+    # OD is treated as approved for attendance only after FINAL approval
+    # (completion proof verified) - two-stage OD workflow.
+    od_q_filter = {
+        **q_filter,
+        "status": {"$in": ["Approved", "Fulfilled / Final Approved"]}
+    }
+    leave_q_filter = {**q_filter, "status": "Approved"}
+
+    od_records = await mongo_db["od_requests"].find(od_q_filter, {
         "registerNumber": 1, "studentName": 1, "rollNumber": 1,
         "odType": 1, "fromDate": 1, "toDate": 1
     }).to_list(length=1000)
 
-    leave_records = await mongo_db["leave_requests"].find(q_filter, {
+    leave_records = await mongo_db["leave_requests"].find(leave_q_filter, {
         "registerNumber": 1, "studentName": 1, "rollNumber": 1,
         "leaveType": 1, "fromDate": 1, "toDate": 1
     }).to_list(length=1000)

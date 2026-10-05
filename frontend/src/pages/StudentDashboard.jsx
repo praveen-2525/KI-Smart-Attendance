@@ -59,8 +59,8 @@ export default function StudentDashboard() {
   });
 
   const { data: odData } = useQuery({
-    queryKey: ['od-my', 'submitted'],
-    queryFn: () => odApi.getMy({ status: 'submitted' }),
+    queryKey: ['od-my'],
+    queryFn: () => odApi.getMy(),
     select: (res) => res.data,
   });
 
@@ -87,8 +87,11 @@ export default function StudentDashboard() {
   const overall = attData?.overall || {};
   const subjects = attData?.subjects || [];
   const timetable = ttData?.timetable || [];
-  const pendingOD = odData?.total || 0;
-  const pendingLeave = leaveData?.requests?.filter(r => r.status === 'submitted').length || 0;
+  const odRequests = odData?.requests || [];
+  const pendingOD = odRequests.filter(r => r.status === 'Pending Approval' || r.status === 'Pending').length;
+  const odAwaitingProof = odRequests.filter(r => r.status === 'Approved – Awaiting Completion Proof' && r.completionStatus !== 'Approved').length;
+  const leaveRequests = leaveData?.requests || [];
+  const pendingLeave = leaveRequests.filter(r => r.status === 'Pending').length;
   const unreadNotif = notifData?.unread_count || 0;
   const overallPct = overall.percentage || 0;
   const isBelow = overall.is_below_target;
@@ -176,7 +179,11 @@ export default function StudentDashboard() {
             <div className="flex justify-between items-center mb-3 p-3" style={{ background: 'var(--bg-body)', borderRadius: 'var(--border-radius-sm)', border: '1px solid var(--border)' }}>
               <div>
                 <div style={{ fontWeight: 600 }}>OD Requests</div>
-                <div className="text-muted" style={{ fontSize: 12 }}>Awaiting approval</div>
+                <div className="text-muted" style={{ fontSize: 12 }}>
+                  {odAwaitingProof > 0
+                    ? `${odAwaitingProof} approved — completion proof required`
+                    : 'Awaiting approval'}
+                </div>
               </div>
               <div className="badge badge-warning">{pendingOD} Pending</div>
             </div>

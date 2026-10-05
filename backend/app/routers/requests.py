@@ -329,36 +329,6 @@ async def get_pending_leave_requests(
     return {"requests": requests}
 
 
-@leave_router.get("/leave-requests/{request_id}")
-@leave_router.get("/leave/{request_id}")
-async def get_leave_request_detail(
-    request_id: str,
-    current_user: models.User = Depends(get_current_user),
-    mongo_db = Depends(get_db)
-):
-    from bson import ObjectId
-    query = {"$or": [{"requestId": request_id}]}
-    if ObjectId.is_valid(request_id):
-        query["$or"].append({"_id": ObjectId(request_id)})
-
-    leave = await mongo_db["leave_requests"].find_one(query)
-    if not leave:
-        raise HTTPException(status_code=404, detail="Leave request not found")
-
-    # Enforce Student Data Security
-    if str(current_user.role).lower() == "student":
-        if (
-            leave.get("registerNumber") != current_user.login_id
-            and leave.get("studentId") != str(current_user.id)
-            and leave.get("collegeEmail", "").lower() != (current_user.email or "").lower()
-        ):
-            raise HTTPException(status_code=403, detail="Access denied. You can only view your own leave requests.")
-
-    leave["id"] = str(leave["_id"])
-    del leave["_id"]
-    return leave
-
-
 @leave_router.post("/leave-requests/{request_id}/cancel")
 async def cancel_leave_request(
     request_id: str,
@@ -478,13 +448,12 @@ async def review_leave_request(
             )
 
             # Notify Student
-            notif_msg = f"Your leave request from {leave.get('fromDate')} to {leave.get('toDate')} was approved directly by HOD." if approval_type == "HOD_DIRECT_APPROVAL" else f"Your leave request was approved by HOD."
             await mongo_db["notifications"].insert_one({
                 "user_id": leave.get("studentId"),
                 "email": leave.get("collegeEmail"),
                 "category": "LEAVE_APPROVAL",
                 "title": "Leave Request Approved",
-                "message": notif_msg,
+                "message": "Your Leave Request has been approved.",
                 "reference_type": "leave_request",
                 "reference_id": leave.get("requestId"),
                 "is_read": False,
@@ -492,7 +461,7 @@ async def review_leave_request(
             })
 
             return {
-                "message": "Leave request approved directly by HOD.",
+                "message": "Leave request approved successfully.",
                 "status": "Approved",
                 "approvalType": approval_type,
                 "approvedBy": current_user.full_name or current_user.login_id
@@ -533,27 +502,28 @@ async def review_leave_request(
                 "email": leave.get("collegeEmail"),
                 "category": "LEAVE_APPROVAL",
                 "title": "Leave Request Rejected",
-                "message": f"Your leave request was rejected by HOD. Remarks: {reviewerRemarks or 'None'}",
+                "message": "Your Leave Request has been rejected.",
                 "reference_type": "leave_request",
                 "reference_id": leave.get("requestId"),
                 "is_read": False,
                 "created_at": now_iso
             })
 
-            return {"message": "Leave request rejected by HOD.", "status": "Rejected", "approvalType": approval_type}
+            return {"message": "Leave request rejected successfully.", "status": "Rejected", "approvalType": approval_type}
 
-    # 2. ADVISOR ACTION
+    # 2. ADVISOR ACTION (normal single-stage approval - Advisor approval is final)
     elif user_role == "advisor":
         if status == "Approved":
             await mongo_db["leave_requests"].update_one(
                 {"_id": leave["_id"]},
                 {
                     "$set": {
+                        "status": "Approved",
                         "advisorStatus": "APPROVED",
+                        "hodStatus": "NOT_REQUIRED",
                         "approvalType": "ADVISOR_APPROVAL",
                         "approvedBy": current_user.full_name or current_user.login_id,
                         "approvedByRole": "ADVISOR",
-                        "hodStatus": "ACTION_REQUIRED",
                         "reviewedBy": current_user.full_name or current_user.login_id,
                         "reviewedAt": now_iso,
                         "reviewerRemarks": reviewerRemarks or "",
@@ -572,7 +542,7 @@ async def review_leave_request(
                 }
             )
 
-            # Notify HOD
+            # Notify HOD (visibility only - approval is final at this stage)
             dept = leave.get("department", "")
             hod_accounts = await mongo_db["staff_accounts"].find({"role": "hod"}).to_list(length=10)
             for hod in hod_accounts:
@@ -582,14 +552,32 @@ async def review_leave_request(
                         "email": hod.get("email"),
                         "category": "LEAVE_REQUEST",
                         "title": f"Advisor Approved Leave: {leave.get('studentName')}",
-                        "message": f"Advisor approved leave request for {leave.get('studentName')} ({leave.get('registerNumber')}). HOD approval required.",
+                        "message": f"Advisor approved leave request for {leave.get('studentName')} ({leave.get('registerNumber')}).",
                         "reference_type": "leave_request",
                         "reference_id": leave.get("requestId"),
                         "is_read": False,
                         "created_at": now_iso
                     })
 
-            return {"message": "Leave request approved by Advisor. Sent for HOD final review.", "status": "Pending", "advisorStatus": "APPROVED"}
+            # Notify Student
+            await mongo_db["notifications"].insert_one({
+                "user_id": leave.get("studentId"),
+                "email": leave.get("collegeEmail"),
+                "category": "LEAVE_APPROVAL",
+                "title": "Leave Request Approved",
+                "message": "Your Leave Request has been approved.",
+                "reference_type": "leave_request",
+                "reference_id": leave.get("requestId"),
+                "is_read": False,
+                "created_at": now_iso
+            })
+
+            return {
+                "message": "Leave request approved successfully.",
+                "status": "Approved",
+                "advisorStatus": "APPROVED",
+                "approvedBy": current_user.full_name or current_user.login_id
+            }
 
         else: # Advisor Rejects
             await mongo_db["leave_requests"].update_one(
@@ -625,14 +613,14 @@ async def review_leave_request(
                 "email": leave.get("collegeEmail"),
                 "category": "LEAVE_APPROVAL",
                 "title": "Leave Request Rejected",
-                "message": f"Your leave request was rejected by Advisor.",
+                "message": "Your Leave Request has been rejected.",
                 "reference_type": "leave_request",
                 "reference_id": leave.get("requestId"),
                 "is_read": False,
                 "created_at": now_iso
             })
 
-            return {"message": "Leave request rejected by Advisor.", "status": "Rejected"}
+            return {"message": "Leave request rejected successfully.", "status": "Rejected"}
 
     # DEO / Admin fallback
     else:
@@ -647,10 +635,33 @@ async def review_leave_request(
                     "reviewedAt": now_iso,
                     "reviewerRemarks": reviewerRemarks or "",
                     "updatedAt": now_iso
+                },
+                "$push": {
+                    "approvalHistory": {
+                        "action": status.upper(),
+                        "userId": str(current_user.id),
+                        "role": str(current_user.role).upper(),
+                        "timestamp": now_iso,
+                        "remarks": reviewerRemarks or ""
+                    }
                 }
             }
         )
-        return {"message": f"Leave request {status.lower()} by DEO.", "status": status}
+        await mongo_db["notifications"].insert_one({
+            "user_id": leave.get("studentId"),
+            "email": leave.get("collegeEmail"),
+            "category": "LEAVE_APPROVAL",
+            "title": "Leave Request Approved" if status == "Approved" else "Leave Request Rejected",
+            "message": "Your Leave Request has been approved." if status == "Approved" else "Your Leave Request has been rejected.",
+            "reference_type": "leave_request",
+            "reference_id": leave.get("requestId"),
+            "is_read": False,
+            "created_at": now_iso
+        })
+        return {
+            "message": "Leave request approved successfully." if status == "Approved" else "Leave request rejected successfully.",
+            "status": status
+        }
 
 
 @leave_router.get("/leave-requests/approved")
@@ -765,6 +776,39 @@ async def get_approved_leave_requests(
 
 
 
+
+
+# NOTE: /leave-requests/{request_id} detail route is registered AFTER the literal
+# /leave-requests/approved route so it does not shadow it (FastAPI matches routes
+# in registration order).
+@leave_router.get("/leave-requests/{request_id}")
+@leave_router.get("/leave/{request_id}")
+async def get_leave_request_detail(
+    request_id: str,
+    current_user: models.User = Depends(get_current_user),
+    mongo_db = Depends(get_db)
+):
+    from bson import ObjectId
+    query = {"$or": [{"requestId": request_id}]}
+    if ObjectId.is_valid(request_id):
+        query["$or"].append({"_id": ObjectId(request_id)})
+
+    leave = await mongo_db["leave_requests"].find_one(query)
+    if not leave:
+        raise HTTPException(status_code=404, detail="Leave request not found")
+
+    # Enforce Student Data Security
+    if str(current_user.role).lower() == "student":
+        if (
+            leave.get("registerNumber") != current_user.login_id
+            and leave.get("studentId") != str(current_user.id)
+            and leave.get("collegeEmail", "").lower() != (current_user.email or "").lower()
+        ):
+            raise HTTPException(status_code=403, detail="Access denied. You can only view your own leave requests.")
+
+    leave["id"] = str(leave["_id"])
+    del leave["_id"]
+    return leave
 
 
 # ============================================================
